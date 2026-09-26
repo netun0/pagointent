@@ -186,16 +186,17 @@
 
 [data-slot="button"][data-variant="default"] {
   border-radius: 999px;
-  background: linear-gradient(180deg, #d8fff6 0%, #3dffc8 42%, #12c99a 100%);
-  color: #04140f;
+  border: 1px solid #3dffc8;
+  background: transparent;
+  color: #3dffc8;
   font-weight: 600;
-  box-shadow:
-    0 0 0 1px rgba(190, 255, 236, 0.45),
-    0 10px 28px rgba(18, 201, 154, 0.28);
+  box-shadow: none;
 }
 
 [data-slot="button"][data-variant="default"]:hover {
-  filter: brightness(1.06);
+  background: transparent;
+  border-color: #7af7e2;
+  color: #7af7e2;
 }
 
 [data-slot="button"][data-variant="outline"] {
