@@ -53,21 +53,16 @@ export function formatWhen(ms: number) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const visionHost: Record<Exclude<NetworkName, "local">, string> = {
-  devnet: "https://devnet.suivision.xyz",
-  testnet: "https://testnet.suivision.xyz",
-};
-
-const visionKind = {
+const explorerKind = {
   tx: "txblock",
   object: "object",
-  account: "account",
-  package: "package",
+  account: "address",
+  package: "object",
 } as const;
 
 export function explorerUrl(network: NetworkName, kind: "tx" | "object" | "account" | "package", id: string) {
   if (!id || network === "local" || id.startsWith("preview-")) return null;
-  return `${visionHost[network]}/${visionKind[kind]}/${id}`;
+  return `https://suiexplorer.com/${explorerKind[kind]}/${id}?network=${network}`;
 }
 
 export function todayInputValue() {
