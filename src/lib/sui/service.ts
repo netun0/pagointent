@@ -68,10 +68,18 @@ function sponsor() {
   return Ed25519Keypair.fromSecretKey(secret);
 }
 
+function merchantSecrets(): Record<string, string> {
+  const fromEnv = process.env.MERCHANT_SECRETS_JSON;
+  if (fromEnv) {
+    const parsed = JSON.parse(fromEnv) as Record<string, string>;
+    if (parsed && typeof parsed === "object") return parsed;
+  }
+  return JSON.parse(readFileSync(secretPath, "utf8")) as Record<string, string>;
+}
+
 function merchantSecret(id: string) {
   try {
-    const parsed = JSON.parse(readFileSync(secretPath, "utf8")) as Record<string, string>;
-    const secret = parsed[id];
+    const secret = merchantSecrets()[id];
     if (!secret) throw new Error("This desk has to accept from its own device.");
     return Ed25519Keypair.fromSecretKey(secret);
   } catch (error) {
