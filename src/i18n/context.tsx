@@ -89,55 +89,33 @@ export function useI18n() {
   return ctx;
 }
 
-type LanguageSelectProps = {
-  /** Tighter layout for the mobile footer bar */
-  compact?: boolean;
-  className?: string;
-};
-
-export function LanguageSelect({ compact = false, className }: LanguageSelectProps) {
+export function LanguageSelect({ className }: { className?: string }) {
   const { locale, setLocale, messages } = useI18n();
-  const label = messages.shell.language;
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2",
-        compact ? "flex-col gap-1.5" : "rounded-full border border-[#3dffc8]/35 bg-[#3dffc8]/8 px-2 py-1 shadow-[inset_0_0_0_1px_rgba(61,255,200,0.12)]",
-        className,
-      )}
-      role="group"
-      aria-label={label}
-    >
-      {!compact ? (
-        <span className="hidden pl-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#7af7e2] sm:inline">
-          {label}
-        </span>
-      ) : (
-        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7af7e2]">{label}</span>
-      )}
-      <div className={cn("flex gap-0.5", compact && "flex-wrap justify-center")}>
-        {locales.map((entry) => {
-          const active = entry.code === locale;
-          return (
-            <button
-              key={entry.code}
-              type="button"
-              title={entry.label}
-              aria-pressed={active}
-              onClick={() => setLocale(entry.code)}
-              className={cn(
-                "min-w-[2.25rem] rounded-full px-2 py-1 font-mono text-[10px] font-medium uppercase tracking-wide transition",
-                active
-                  ? "bg-[#3dffc8]/20 text-[#3dffc8] shadow-[inset_0_0_0_1px_rgba(61,255,200,0.55)]"
-                  : "text-muted-foreground hover:bg-white/10 hover:text-[#7af7e2]",
-              )}
-            >
-              {localeShort[entry.code]}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <label className={cn("inline-flex items-center", className)}>
+      <span className="sr-only">{messages.shell.language}</span>
+      <select
+        value={locale}
+        aria-label={messages.shell.language}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (isLocale(next)) setLocale(next);
+        }}
+        className={cn(
+          "h-8 max-w-[3.25rem] cursor-pointer appearance-none bg-transparent py-0 pl-0 pr-4",
+          "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground",
+          "outline-none hover:text-[#7af7e2] focus:text-[#7af7e2]",
+          "bg-[length:0.55rem] bg-[position:right_0.1rem_center] bg-no-repeat",
+          "bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2212%22%20height%3D%2212%22%20fill%3D%22none%22%3E%3Cpath%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20d%3D%22m3%204.5%203%203%203-3%22/%3E%3C/svg%3E')]",
+        )}
+      >
+        {locales.map((entry) => (
+          <option key={entry.code} value={entry.code} title={entry.label}>
+            {localeShort[entry.code]}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

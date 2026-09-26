@@ -81,10 +81,7 @@ export function WalletScreen() {
               <Button
                 variant="outline"
                 className="mt-3"
-                onClick={() => {
-                  logoutZkLogin();
-                  forgetPayer();
-                }}
+                onClick={() => forgetPayer()}
               >
                 Sign out of zkLogin
               </Button>

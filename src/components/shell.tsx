@@ -50,18 +50,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <div className="ml-auto flex min-w-0 shrink items-center gap-2 text-xs sm:gap-3">
-            <LanguageSelect className="hidden sm:flex" />
+          <div className="ml-auto flex shrink-0 items-center gap-3 text-xs">
+            <LanguageSelect />
             <Link
               href="/wallet"
-              className="shrink-0 font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-[#7af7e2]"
+              className="font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-[#7af7e2]"
             >
               {messages.nav.keys}
             </Link>
           </div>
-        </div>
-        <div className="border-t border-white/10 px-4 py-2 sm:hidden">
-          <LanguageSelect compact className="w-full justify-center" />
         </div>
       </header>
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">{children}</div>
