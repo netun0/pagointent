@@ -10,6 +10,7 @@ import {
   listDesks,
   listObligations,
   prepareSponsored,
+  readChainObject,
   submitTransaction,
   verifyMerchant,
 } from "@/lib/sui/service";
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
     if (op === "status") return Response.json(await getStatus());
     if (op === "obligations") return Response.json({ obligations: await listObligations() });
     if (op === "obligation") return Response.json({ obligation: await getObligation(url.searchParams.get("id") ?? "") });
+    if (op === "chain-object") return Response.json({ object: await readChainObject(url.searchParams.get("id") ?? "") });
     if (op === "desks") return Response.json(await listDesks());
     if (op === "balance") return Response.json(await getBalances(url.searchParams.get("owner") ?? ""));
     return fail("Unknown read.", 404);

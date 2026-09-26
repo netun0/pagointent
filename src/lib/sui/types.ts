@@ -15,6 +15,16 @@ export type ChainStatus = {
   rpcError: string | null;
 };
 
+export type ChainObjectView = {
+  objectId: string;
+  version: string;
+  digest: string;
+  type: string | null;
+  owner: string | null;
+  previousTransaction: string | null;
+  fields: { key: string; value: string }[];
+};
+
 export type ObligationRecord = {
   id: string;
   payer: string;

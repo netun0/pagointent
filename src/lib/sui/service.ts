@@ -13,6 +13,7 @@ import {
   type BalanceSnapshot,
   type ChainStatus,
   type Desk,
+  type ChainObjectView,
   type ObligationRecord,
   type TxReceipt,
 } from "@/lib/sui/types";
@@ -243,6 +244,40 @@ export async function listObligations(): Promise<ObligationRecord[]> {
     if (object instanceof Error || !object.json) return [];
     return [parseObligation(object.objectId, object.json)];
   });
+}
+
+function ownerLabel(owner: { $kind?: string; AddressOwner?: string; ObjectOwner?: string; ConsensusAddressOwner?: { owner?: string } } | undefined) {
+  if (!owner?.$kind || owner.$kind === "Unknown") return null;
+  if (owner.$kind === "Shared") return "shared";
+  if (owner.$kind === "Immutable") return "immutable";
+  if (owner.$kind === "AddressOwner") return owner.AddressOwner || null;
+  if (owner.$kind === "ObjectOwner") return owner.ObjectOwner || null;
+  if (owner.$kind === "ConsensusAddressOwner") return owner.ConsensusAddressOwner?.owner || null;
+  return null;
+}
+
+function fieldValue(value: unknown) {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "bigint") return value.toString();
+  return JSON.stringify(value);
+}
+
+export async function readChainObject(id: string): Promise<ChainObjectView | null> {
+  requireChain();
+  const response = await sui().getObject({ objectId: id, include: { json: true, previousTransaction: true } });
+  const object = response.object;
+  if (!object?.objectId) return null;
+  const json = object.json && typeof object.json === "object" ? object.json : null;
+  return {
+    objectId: object.objectId,
+    version: object.version == null ? "" : String(object.version),
+    digest: object.digest ?? "",
+    type: object.type ?? null,
+    owner: ownerLabel(object.owner),
+    previousTransaction: object.previousTransaction ?? null,
+    fields: json ? Object.entries(json).map(([key, value]) => ({ key, value: fieldValue(value) })) : [],
+  };
 }
 
 export async function getObligation(id: string): Promise<ObligationRecord | null> {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ChainObject } from "@/components/chain-object";
 import { Conditions } from "@/components/conditions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,6 @@ import {
 import { usePayer } from "@/lib/custody";
 import {
   canRelease,
-  explorerUrl,
   formatUsd,
   formatYen,
   isZeroAddress,
@@ -90,7 +90,6 @@ export function ObligationScreen() {
   const ready = canRelease(obligation, now);
   const boundDesk = desks.find((desk) => desk.address && desk.address.toLowerCase() === obligation.merchant.toLowerCase());
   const sentence = obligationSentenceLocale(messages, obligation);
-  const explorer = status ? explorerUrl(status.mode, "object", obligation.id) : null;
   const expired = (obligation.status === OFFERED || obligation.status === ACCEPTED) && obligation.expiresAtMs < now;
   const trace = buildTrace(messages, obligation);
 
@@ -146,11 +145,10 @@ export function ObligationScreen() {
         <div className="mt-6">
           <Conditions obligation={obligation} now={now} />
         </div>
-        {explorer ? (
-          <a className="mt-4 inline-block font-mono text-xs uppercase tracking-[0.12em] text-[#7af7e2] underline decoration-[#3dffc8]/40 underline-offset-4" href={explorer} target="_blank" rel="noreferrer">
-            {o.viewObject}
-          </a>
-        ) : null}
+        <a className="mt-4 inline-block font-mono text-xs uppercase tracking-[0.12em] text-[#7af7e2] underline decoration-[#3dffc8]/40 underline-offset-4" href="#sui-object">
+          {o.viewObject}
+        </a>
+        <ChainObject id={obligation.id} network={status?.mode ?? null} />
       </div>
       <div className="space-y-5">
         <section className="panel p-5">

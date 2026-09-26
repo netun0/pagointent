@@ -1,7 +1,7 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import type { Payer } from "@/lib/custody";
 import { signTransactionBytes } from "@/lib/payer-sign";
-import type { BalanceSnapshot, ChainStatus, Desk, ObligationRecord, TxReceipt } from "@/lib/sui/types";
+import type { BalanceSnapshot, ChainObjectView, ChainStatus, Desk, ObligationRecord, TxReceipt } from "@/lib/sui/types";
 
 async function request<T>(method: "GET" | "POST", query: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api/chain${query}`, {
@@ -55,6 +55,10 @@ export function listObligations() {
 
 export function getObligation(id: string) {
   return request<{ obligation: ObligationRecord | null }>("GET", `?op=obligation&id=${id}`);
+}
+
+export function getChainObject(id: string) {
+  return request<{ object: ChainObjectView | null }>("GET", `?op=chain-object&id=${encodeURIComponent(id)}`);
 }
 
 export function listDesks() {

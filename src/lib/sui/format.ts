@@ -53,16 +53,16 @@ export function formatWhen(ms: number) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const explorerKind = {
-  tx: "txblock",
+const suiscanKind = {
+  tx: "tx",
   object: "object",
-  account: "address",
+  account: "account",
   package: "object",
 } as const;
 
 export function explorerUrl(network: NetworkName, kind: "tx" | "object" | "account" | "package", id: string) {
   if (!id || network === "local" || id.startsWith("preview-")) return null;
-  return `https://suiexplorer.com/${explorerKind[kind]}/${id}?network=${network}`;
+  return `https://suiscan.xyz/${network}/${suiscanKind[kind]}/${id}`;
 }
 
 export function todayInputValue() {
