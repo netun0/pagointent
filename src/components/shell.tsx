@@ -70,7 +70,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">{children}</div>
       <footer className="mx-auto w-full max-w-6xl px-4 pb-24 font-mono text-[11px] leading-relaxed tracking-wide text-muted-foreground md:pb-8">
-        Orbital moves money. Yodl pays a merchant who already has a local rail. PagoIntent decides whether an agent is allowed to pay.
+        PagoIntent decides whether an agent is allowed to pay.
         Settlement is test USDC on Sui. The obligation is denominated in yen at a rate frozen in the object.
         {status?.referenceGasPrice ? ` Reference gas ${status.referenceGasPrice} MIST.` : ""}
       </footer>

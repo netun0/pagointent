@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-const contrasts = [
-  ["Orbital", "Moves money through global payment infrastructure, once a business is already sending it."],
-  ["Yodl", "Pays a merchant who already has a local payment rail."],
-  ["PagoIntent", "Decides what must be true before an autonomous agent is allowed to pay."],
+const rules = [
+  ["Lock", "The yen cap sits in escrow. Nothing moves until the predicate on the object is true."],
+  ["Accept", "A merchant freezes their own price, at or under the cap, and the destination is bound to that address."],
+  ["Release", "The agent may pay only when verification, price, destination, proof, and deadline all hold."],
 ];
 
 const gates = [
@@ -52,18 +52,9 @@ export default function HomePage() {
           ))}
         </dl>
         <dl className="mt-8 grid gap-3">
-          {contrasts.map(([name, copy]) => (
-            <div
-              key={name}
-              className={
-                name === "PagoIntent"
-                  ? "panel px-4 py-4 shadow-[0_0_32px_rgba(61,255,200,0.08)]"
-                  : "rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4"
-              }
-            >
-              <dt className={name === "PagoIntent" ? "kicker" : "font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground"}>
-                {name}
-              </dt>
+          {rules.map(([name, copy]) => (
+            <div key={name} className="panel px-4 py-4">
+              <dt className="kicker">{name}</dt>
               <dd className="mt-1.5 text-sm leading-relaxed text-foreground/90">{copy}</dd>
             </div>
           ))}
