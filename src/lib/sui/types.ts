@@ -8,6 +8,8 @@ export type ChainStatus = {
   sponsorAddress: string | null;
   sponsorReady: boolean;
   referenceGasPrice: string | null;
+  epoch: string | null;
+  zkLoginGoogleClientId: string | null;
   publishDigest: string | null;
   rpcOk: boolean;
   rpcError: string | null;

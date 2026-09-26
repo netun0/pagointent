@@ -65,6 +65,12 @@ export const pt: Messages = {
     needSignerBody:
       "O PagoIntent cria uma chave Sui neste navegador e financia com USDC de teste. Essa chave bloqueia a custódia e é a única que pode pedir liberação. Não é a carteira do comerciante.",
     createSigner: "Criar signatário do agente",
+    zkLoginGoogle: "Entrar com Google (zkLogin)",
+    zkLoginBusy: "Redirecionando ao Google…",
+    zkLoginHint: "OAuth dá um endereço Sui estável sem salvar semente neste navegador.",
+    zkLoginOr: "ou",
+    payerZkLogin: "zkLogin",
+    payerDevice: "Chave local",
     funding: "Financiando…",
     signer: "Signatário",
     testUsdc: "USDC de teste",

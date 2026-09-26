@@ -8,13 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n/context";
 import { getBalances, getStatus } from "@/lib/actions";
-import { decryptKey, forgetVault, usePayer, useVault, writeVault, type VaultFile } from "@/lib/custody";
+import { decryptKey, forgetPayer, forgetVault, usePayer, useVault, writeVault, type VaultFile } from "@/lib/custody";
 import { explorerUrl, formatSui, formatUsd, shortAddress } from "@/lib/sui/format";
 import type { BalanceSnapshot, ChainStatus } from "@/lib/sui/types";
 
 export function WalletScreen() {
   const { messages } = useI18n();
   const w = messages.wallet;
+  const c = messages.compose;
   const payer = usePayer();
   const vault = useVault();
   const [password, setPassword] = useState("");
@@ -71,7 +72,24 @@ export function WalletScreen() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{w.agentTitle}</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{w.agentLead}</p>
         {payer ? (
-          <p className="mt-4 font-mono text-sm">{shortAddress(payer.address)}</p>
+          <div className="mt-4">
+            <p className="font-mono text-sm">{shortAddress(payer.address)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {payer.kind === "zklogin" ? `${c.payerZkLogin} · Google` : c.payerDevice}
+            </p>
+            {payer.kind === "zklogin" ? (
+              <Button
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  logoutZkLogin();
+                  forgetPayer();
+                }}
+              >
+                Sign out of zkLogin
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <p className="mt-4 text-sm text-muted-foreground">
             {w.noSigner}{" "}

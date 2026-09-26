@@ -150,6 +150,18 @@ The Move package in `move/pago` does three things:
 
 The app uses `@mysten/sui` gRPC. The payer signs lock, cancel, reclaim, and release. Merchant accept and proof are sponsored: the merchant is the sender, the sponsor pays gas, so a new desk does not need SUI.
 
+## zkLogin (Google) for the agent signer
+
+The payer that locks and releases obligations can be a **Google zkLogin** address instead of a random Ed25519 key in `localStorage`. The flow follows the [Sui zkLogin integration guide](https://docs.sui.io/sui-stack/zklogin-integration/integration-guide):
+
+1. The app creates an **ephemeral key pair** and sends you to Google with a **nonce** tied to that key.
+2. After OAuth, the backend proxies **salt** (Mysten) and **Groth16 proof** (network prover) so JWTs never hit the browser prover directly.
+3. The session (ephemeral key + proof inputs) lives in **`sessionStorage`** for the tab. When the epoch passes `maxEpoch`, sign in again.
+4. Transactions are signed with [`ZkLoginSigner`](https://docs.sui.io/sui-stack/zklogin-integration/zklogin) on the client and submitted like any other payer signature.
+
+Configure `NEXT_PUBLIC_GOOGLE_ZKLOGIN_CLIENT_ID` in `.env.local` and add the redirect URI  
+`http://127.0.0.1:43123/auth/zklogin/callback` (and your production URL) in Google Cloud Console. Merchant desk keys remain password-encrypted Ed25519 keys.
+
 ## Run it
 
 ```bash

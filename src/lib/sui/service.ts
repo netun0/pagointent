@@ -3,6 +3,7 @@ import path from "node:path";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
+import { googleClientId } from "@/lib/zklogin/config";
 import { chainMode, deployment } from "@/lib/sui/config";
 import { sui } from "@/lib/sui/client";
 import { quoteToMicro } from "@/lib/sui/format";
@@ -190,16 +191,20 @@ export async function getStatus(): Promise<ChainStatus> {
       sponsorAddress: null,
       sponsorReady: false,
       referenceGasPrice: null,
+      epoch: null,
+      zkLoginGoogleClientId: googleClientId() || null,
       publishDigest: null,
       rpcOk: false,
       rpcError: offChain,
     };
   }
   let referenceGasPrice: string | null = null;
+  let epoch: string | null = null;
   let rpcError: string | null = null;
   try {
-    const gas = await sui().getReferenceGasPrice();
+    const [gas, system] = await Promise.all([sui().getReferenceGasPrice(), sui().core.getCurrentSystemState()]);
     referenceGasPrice = gas.referenceGasPrice;
+    epoch = system.systemState.epoch;
   } catch (error) {
     rpcError = explain(error);
   }
@@ -211,6 +216,8 @@ export async function getStatus(): Promise<ChainStatus> {
     sponsorAddress: deployed.sponsorAddress,
     sponsorReady: Boolean(process.env.SPONSOR_SECRET_KEY),
     referenceGasPrice,
+    epoch,
+    zkLoginGoogleClientId: googleClientId() || null,
     publishDigest: deployed.publishDigest,
     rpcOk: !rpcError,
     rpcError,

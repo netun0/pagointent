@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { clearZkLoginSession, readZkLoginSession } from "@/lib/zklogin/session";
+import type { ZkLoginSession } from "@/lib/zklogin/session";
 
 const PAYER_KEY = "pagointent.payer";
 const VAULT_KEY = "pagointent.vault";
@@ -13,6 +15,10 @@ export type VaultFile = {
   cipher: string;
   iterations: number;
 };
+
+export type Payer =
+  | { kind: "ed25519"; secret: string; address: string; keypair: Ed25519Keypair }
+  | { kind: "zklogin"; address: string; session: ZkLoginSession };
 
 function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
@@ -77,8 +83,13 @@ export async function decryptKey(password: string, vault: VaultFile) {
 
 const listeners = new Set<() => void>();
 
-function emit() {
+export function emitCustodyChange() {
+  payerSnapshotCache = undefined;
   listeners.forEach((listener) => listener());
+}
+
+function emit() {
+  emitCustodyChange();
 }
 
 function subscribe(listener: () => void) {
@@ -110,25 +121,40 @@ export function forgetVault() {
 }
 
 export function writePayerSecret(secret: string) {
+  clearZkLoginSession();
   localStorage.setItem(PAYER_KEY, secret);
-  payerSecretCache = undefined;
+  emit();
+}
+
+export function forgetPayer() {
+  localStorage.removeItem(PAYER_KEY);
+  clearZkLoginSession();
   emit();
 }
 
 let payerSecretCache: string | null | undefined;
-let payerSnapshot: { secret: string; address: string; keypair: Ed25519Keypair } | null = null;
+let payerSnapshotCache: Payer | null | undefined;
 
-function readPayer() {
+function readPayer(): Payer | null {
+  const zk = readZkLoginSession();
+  if (zk) {
+    if (payerSnapshotCache?.kind === "zklogin" && payerSnapshotCache.address === zk.address) {
+      return payerSnapshotCache;
+    }
+    payerSnapshotCache = { kind: "zklogin", address: zk.address, session: zk };
+    return payerSnapshotCache;
+  }
+
   const secret = localStorage.getItem(PAYER_KEY);
-  if (secret === payerSecretCache) return payerSnapshot;
+  if (secret === payerSecretCache && payerSnapshotCache?.kind === "ed25519") return payerSnapshotCache;
   payerSecretCache = secret;
   if (!secret) {
-    payerSnapshot = null;
+    payerSnapshotCache = null;
     return null;
   }
   const keypair = Ed25519Keypair.fromSecretKey(secret);
-  payerSnapshot = { secret, address: keypair.toSuiAddress(), keypair };
-  return payerSnapshot;
+  payerSnapshotCache = { secret, address: keypair.toSuiAddress(), keypair, kind: "ed25519" };
+  return payerSnapshotCache;
 }
 
 export function usePayer() {
@@ -137,4 +163,9 @@ export function usePayer() {
 
 export function useVault() {
   return useSyncExternalStore(subscribe, readVault, () => null);
+}
+
+/** @deprecated use payer.kind === "ed25519" ? payer.secret : undefined */
+export function payerEd25519Secret(payer: Payer | null) {
+  return payer?.kind === "ed25519" ? payer.secret : undefined;
 }

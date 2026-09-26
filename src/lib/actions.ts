@@ -1,4 +1,6 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import type { Payer } from "@/lib/custody";
+import { signTransactionBytes } from "@/lib/payer-sign";
 import type { BalanceSnapshot, ChainStatus, Desk, ObligationRecord, TxReceipt } from "@/lib/sui/types";
 
 async function request<T>(method: "GET" | "POST", query: string, body?: unknown): Promise<T> {
@@ -21,12 +23,13 @@ function fromBase64(value: string) {
 
 type Mutation = Record<string, unknown> & { action: string };
 
-async function mutate(body: Mutation, secret?: string): Promise<TxReceipt> {
+async function mutate(body: Mutation, payer?: Payer): Promise<TxReceipt> {
   const status = await getStatus();
   if (status.mode === "local") return request<TxReceipt>("POST", "", { op: "act", ...body });
-  if (!secret || !("sender" in body)) throw new Error("Unlock the key that should sign this.");
+  if (!payer || !("sender" in body)) throw new Error("Unlock the key that should sign this.");
+  if (status.mode !== "devnet" && status.mode !== "testnet") throw new Error("Unsupported network.");
   const built = await request<{ bytes: string }>("POST", "", { op: "build", ...body });
-  const signed = await Ed25519Keypair.fromSecretKey(secret).signTransaction(fromBase64(built.bytes));
+  const signed = await signTransactionBytes(payer, built.bytes, status.mode);
   return request<TxReceipt>("POST", "", { op: "submit", bytes: built.bytes, signature: signed.signature });
 }
 
@@ -63,51 +66,45 @@ export function fundAddress(address: string) {
 }
 
 export function createObligation(input: {
-  secret: string;
+  payer: Payer;
   service: string;
   maxQuote: string;
   requireVerified: boolean;
   requireProof: boolean;
   expiresAtMs: number;
 }) {
-  const sender = Ed25519Keypair.fromSecretKey(input.secret).toSuiAddress();
   return mutate(
     {
       action: "create",
-      sender,
+      sender: input.payer.address,
       service: input.service,
       maxQuote: input.maxQuote,
       requireVerified: input.requireVerified,
       requireProof: input.requireProof,
       expiresAtMs: input.expiresAtMs,
     },
-    input.secret,
+    input.payer,
   );
 }
 
-export function cancelObligation(secret: string, obligationId: string) {
-  const sender = Ed25519Keypair.fromSecretKey(secret).toSuiAddress();
-  return mutate({ action: "cancel", sender, obligationId }, secret);
+export function cancelObligation(payer: Payer, obligationId: string) {
+  return mutate({ action: "cancel", sender: payer.address, obligationId }, payer);
 }
 
-export function reclaimObligation(secret: string, obligationId: string) {
-  const sender = Ed25519Keypair.fromSecretKey(secret).toSuiAddress();
-  return mutate({ action: "reclaim", sender, obligationId }, secret);
+export function reclaimObligation(payer: Payer, obligationId: string) {
+  return mutate({ action: "reclaim", sender: payer.address, obligationId }, payer);
 }
 
-export function releaseObligation(secret: string, obligationId: string) {
-  const sender = Ed25519Keypair.fromSecretKey(secret).toSuiAddress();
-  return mutate({ action: "release", sender, obligationId }, secret);
+export function releaseObligation(payer: Payer, obligationId: string) {
+  return mutate({ action: "release", sender: payer.address, obligationId }, payer);
 }
 
-export function revisePrice(secret: string, obligationId: string, quote: string) {
-  const sender = Ed25519Keypair.fromSecretKey(secret).toSuiAddress();
-  return mutate({ action: "revise", sender, obligationId, quote }, secret);
+export function revisePrice(payer: Payer, obligationId: string, quote: string) {
+  return mutate({ action: "revise", sender: payer.address, obligationId, quote }, payer);
 }
 
-export function redirectPayment(secret: string, obligationId: string, destination: string) {
-  const sender = Ed25519Keypair.fromSecretKey(secret).toSuiAddress();
-  return mutate({ action: "redirect", sender, obligationId, destination }, secret);
+export function redirectPayment(payer: Payer, obligationId: string, destination: string) {
+  return mutate({ action: "redirect", sender: payer.address, obligationId, destination }, payer);
 }
 
 export function contactDesk(obligationId: string, merchant: string, merchantName: string, quote: string) {

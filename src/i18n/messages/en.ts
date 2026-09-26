@@ -63,6 +63,12 @@ export const en = {
     needSignerBody:
       "PagoIntent creates a Sui key in this browser and funds it with test USDC. That key locks the escrow and is the one allowed to ask for release. It is not a wallet for the merchant.",
     createSigner: "Create the agent signer",
+    zkLoginGoogle: "Sign in with Google (zkLogin)",
+    zkLoginBusy: "Redirecting to Google…",
+    zkLoginHint: "OAuth gives you a stable Sui address without saving a seed phrase in this browser.",
+    zkLoginOr: "or",
+    payerZkLogin: "zkLogin",
+    payerDevice: "Device key",
     funding: "Funding…",
     signer: "Signer",
     testUsdc: "Test USDC",

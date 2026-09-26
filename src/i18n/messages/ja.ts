@@ -63,6 +63,12 @@ export const ja: Messages = {
     needSignerBody:
       "PagoIntent はブラウザ内に Sui 鍵を作成しテスト USDC で資金を入れます。その鍵がエスクローをロックし、解放を要求できる唯一の鍵です。加盟店用ウォレットではありません。",
     createSigner: "エージェント署名者を作成",
+    zkLoginGoogle: "Google でサインイン（zkLogin）",
+    zkLoginBusy: "Google へリダイレクト中…",
+    zkLoginHint: "OAuth でシードフレーズを保存せず安定した Sui アドレスを取得します。",
+    zkLoginOr: "または",
+    payerZkLogin: "zkLogin",
+    payerDevice: "端末鍵",
     funding: "資金投入中…",
     signer: "署名者",
     testUsdc: "テスト USDC",

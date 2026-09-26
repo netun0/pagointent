@@ -242,7 +242,7 @@ export function ObligationScreen() {
               disabled={busy !== null || !payer}
               onClick={() => {
                 if (!payer) return;
-                run("release", () => releaseObligation(payer.secret, obligation.id), o.toastReleased);
+                run("release", () => releaseObligation(payer, obligation.id), o.toastReleased);
               }}
             >
               {busy === "release" ? o.askingChain : o.askPay}
@@ -255,7 +255,7 @@ export function ObligationScreen() {
           <Button
             variant="outline"
             disabled={busy !== null || !payer}
-            onClick={() => payer && run("cancel", () => cancelObligation(payer.secret, obligation.id), o.toastCancel)}
+            onClick={() => payer && run("cancel", () => cancelObligation(payer, obligation.id), o.toastCancel)}
           >
             {busy === "cancel" ? o.returning : o.cancelReturn}
           </Button>
@@ -265,7 +265,7 @@ export function ObligationScreen() {
           <Button
             variant="outline"
             disabled={busy !== null || !payer}
-            onClick={() => payer && run("reclaim", () => reclaimObligation(payer.secret, obligation.id), o.toastReclaim)}
+            onClick={() => payer && run("reclaim", () => reclaimObligation(payer, obligation.id), o.toastReclaim)}
           >
             {busy === "reclaim" ? o.returning : o.returnExpired}
           </Button>
@@ -281,7 +281,7 @@ export function ObligationScreen() {
                 variant="outline"
                 className="bg-background"
                 disabled={busy !== null || !payer}
-                onClick={() => payer && refuse("revise", () => revisePrice(payer.secret, obligation.id, "9999"), o.refusePrice)}
+                onClick={() => payer && refuse("revise", () => revisePrice(payer, obligation.id, "9999"), o.refusePrice)}
               >
                 {o.changePrice}
               </Button>
@@ -292,7 +292,7 @@ export function ObligationScreen() {
                 disabled={busy !== null || !payer}
                 onClick={() =>
                   payer &&
-                  refuse("redirect", () => redirectPayment(payer.secret, obligation.id, "0x" + "ab".repeat(32)), o.refuseDest)
+                  refuse("redirect", () => redirectPayment(payer, obligation.id, "0x" + "ab".repeat(32)), o.refuseDest)
                 }
               >
                 {o.payOther}

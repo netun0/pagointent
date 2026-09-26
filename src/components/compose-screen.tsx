@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n/context";
 import { obligationSentenceLocale } from "@/i18n/format-locale";
-import { createObligation, fundAddress, getBalances } from "@/lib/actions";
+import { ZkLoginGoogleButton } from "@/components/zklogin-google-button";
+import { createObligation, fundAddress, getBalances, getStatus } from "@/lib/actions";
 import { usePayer, writePayerSecret } from "@/lib/custody";
 import { expiryFromDateInput, formatSui, formatUsd, formatYen, parseYen, quoteToMicro, shortAddress, todayInputValue, weekAheadInputValue } from "@/lib/sui/format";
 import type { BalanceSnapshot } from "@/lib/sui/types";
@@ -20,7 +21,7 @@ export function ComposeScreen() {
   const c = messages.compose;
   const payer = usePayer();
   const address = payer?.address ?? null;
-  const secret = payer?.secret ?? null;
+  const [zkLoginEnabled, setZkLoginEnabled] = useState(false);
   const [balances, setBalances] = useState<BalanceSnapshot | null>(null);
   const [service, setService] = useState("");
   const [amount, setAmount] = useState("");
@@ -29,6 +30,12 @@ export function ComposeScreen() {
   const [proof, setProof] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getStatus()
+      .then((status) => setZkLoginEnabled(Boolean(status.zkLoginGoogleClientId)))
+      .catch(() => setZkLoginEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (!address) return;
@@ -70,7 +77,7 @@ export function ComposeScreen() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!secret || !quote) {
+    if (!payer || !quote) {
       setError(c.errAmount);
       return;
     }
@@ -83,7 +90,7 @@ export function ComposeScreen() {
     setError(null);
     try {
       const receipt = await createObligation({
-        secret,
+        payer,
         service,
         maxQuote: quote.toString(),
         requireVerified: verified,
@@ -110,6 +117,13 @@ export function ComposeScreen() {
           <div className="panel mt-6 p-5">
             <p className="font-medium">{c.needSignerTitle}</p>
             <p className="mt-1 text-sm text-muted-foreground">{c.needSignerBody}</p>
+            {zkLoginEnabled ? (
+              <div className="mt-4 space-y-3">
+                <ZkLoginGoogleButton label={c.zkLoginGoogle} busyLabel={c.zkLoginBusy} disabled={busy !== null} />
+                <p className="text-xs text-muted-foreground">{c.zkLoginHint}</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{c.zkLoginOr}</p>
+              </div>
+            ) : null}
             <Button className="mt-4 h-11 px-5" onClick={createSigner} disabled={busy !== null}>
               {busy === "wallet" ? c.funding : c.createSigner}
             </Button>
@@ -119,7 +133,12 @@ export function ComposeScreen() {
             <div className="panel flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
               <div>
                 <p className="text-muted-foreground">{c.signer}</p>
-                <p className="font-mono">{shortAddress(address)}</p>
+                <p className="font-mono">
+                  {shortAddress(address)}{" "}
+                  <span className="text-muted-foreground">
+                    · {payer?.kind === "zklogin" ? c.payerZkLogin : c.payerDevice}
+                  </span>
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">{c.testUsdc}</p>
