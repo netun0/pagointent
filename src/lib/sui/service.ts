@@ -1,55 +1,83 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
+import { deskById, directory } from "@/lib/desks";
 import { chainMode, deployment } from "@/lib/sui/config";
 import { sui } from "@/lib/sui/client";
-import { bytesToHex, claimHashToHex, hashSecret, hexToBytes } from "@/lib/sui/hash";
+import { quoteToMicro } from "@/lib/sui/format";
 import {
   localAccept,
-  localActivity,
-  localBadge,
   localBalances,
   localBootstrap,
-  localBuy,
   localCancel,
+  localContact,
   localCreate,
-  localIntent,
-  localIntents,
-  localList,
-  localListings,
+  localDecline,
+  localObligation,
+  localObligations,
+  localProof,
+  localProve,
   localReclaim,
+  localRedirect,
+  localRelease,
+  localRevise,
+  localVerified,
+  localVerify,
 } from "@/lib/sui/local-ledger";
 import {
-  STATUS_ACCEPTED,
-  STATUS_PENDING,
-  type ActivityRecord,
+  RATE_DEN,
+  RATE_NUM,
   type BalanceSnapshot,
   type ChainStatus,
-  type IntentRecord,
-  type ListingRecord,
+  type Desk,
+  type ObligationRecord,
   type TxReceipt,
 } from "@/lib/sui/types";
+
+const secretPath = path.join(process.cwd(), "data", "merchant-secrets.json");
+
+function aborted(raw: string, code: number) {
+  return new RegExp(`abort code: ${code}\\b`).test(raw) || raw.includes(`, ${code})`);
+}
 
 function explain(error: unknown) {
   const raw = typeof error === "string" ? error : error instanceof Error ? error.message : JSON.stringify(error);
   if (!raw) return "The transaction failed.";
-  if (raw.includes("EWrongSecret")) return "That code does not match this intent.";
-  if (raw.includes("ENotPending")) return "This intent is no longer open.";
-  if (raw.includes("EExpired")) return "This intent has passed its date.";
-  if (raw.includes("ENotExpired")) return "This intent has not expired yet.";
-  if (raw.includes("ENotPayer")) return "Only the payer can close this intent.";
-  if (raw.includes("EAlready")) return "This wallet already has a learner badge.";
-  if (raw.includes("EInactive")) return "That item has already been bought.";
-  if (raw.includes("EPrice") || raw.includes("Insufficient")) return "The wallet does not have the right amount of test USDC.";
-  if (raw.includes("ESelf")) return "You can't buy your own listing.";
+  if (raw.includes("EUnverified") || aborted(raw, 8)) return "That merchant is not on the verification registry.";
+  if (raw.includes("EPriceChanged") || aborted(raw, 13)) return "The price was frozen at acceptance. There is no instruction that changes it.";
+  if (raw.includes("ENoProof") || aborted(raw, 10)) return "Proof of delivery is still missing.";
+  if (raw.includes("EDestination") || aborted(raw, 9)) return "The destination was bound at acceptance. There is no instruction that retargets it.";
+  if (raw.includes("EPrice") || aborted(raw, 7)) return "That price is above the cap.";
+  if (raw.includes("ENotExpired") || aborted(raw, 6)) return "This obligation has not expired yet.";
+  if (raw.includes("EExpired") || aborted(raw, 5)) return "This obligation has passed its date.";
+  if (raw.includes("ENotAccepted") || aborted(raw, 4)) return "This obligation is not accepted.";
+  if (raw.includes("ENotOffered") || aborted(raw, 3)) return "This obligation is no longer open.";
+  if (raw.includes("ENotMerchant") || aborted(raw, 12)) return "Only the bound merchant can do that.";
+  if (raw.includes("ENotPayer") || aborted(raw, 11)) return "Only the payer can cancel this obligation.";
+  if (raw.includes("EClosed") || aborted(raw, 14)) return "This obligation is already closed.";
+  if (raw.includes("EAmount") || raw.includes("Insufficient")) return "The wallet does not have the right amount of test USDC.";
   if (raw.includes("ELimit")) return "The faucet allows at most 100 test USDC per call.";
-  return raw.length > 320 ? `${raw.slice(0, 320)}…` : raw;
+  return raw.length > 360 ? `${raw.slice(0, 360)}…` : raw;
 }
 
 function sponsor() {
   const secret = process.env.SPONSOR_SECRET_KEY;
   if (!secret) throw new Error("This server has no sponsor key. Run npm run chain:setup.");
   return Ed25519Keypair.fromSecretKey(secret);
+}
+
+function merchantSecret(id: string) {
+  try {
+    const parsed = JSON.parse(readFileSync(secretPath, "utf8")) as Record<string, string>;
+    const secret = parsed[id];
+    if (!secret) throw new Error("This desk has to accept from its own device.");
+    return Ed25519Keypair.fromSecretKey(secret);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("own device")) throw error;
+    throw new Error("Merchant keys are not on this server. Run npm run chain:setup.");
+  }
 }
 
 function sleep(ms: number) {
@@ -64,38 +92,43 @@ async function waitForCoin(owner: string, coinType: string, minimum: bigint) {
   }
 }
 
-function field(json: Record<string, unknown>, key: string) {
-  return json[key];
-}
-
 function asString(value: unknown) {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   return "";
 }
 
-function parseIntent(id: string, json: Record<string, unknown>): IntentRecord {
-  return {
-    id,
-    payer: asString(field(json, "payer")),
-    payeeName: asString(field(json, "payee_name")),
-    purpose: asString(field(json, "purpose")),
-    amount: asString(field(json, "amount")),
-    expiresAtMs: Number(field(json, "expires_at_ms") ?? 0),
-    status: Number(field(json, "status") ?? 0),
-    payee: asString(field(json, "payee")),
-  };
+function asBool(value: unknown) {
+  return value === true || value === "true";
 }
 
-function parseListing(id: string, json: Record<string, unknown>): ListingRecord {
+function isZero(address: string) {
+  return !address || /^0x0+$/.test(address.toLowerCase());
+}
+
+function parseObligation(id: string, json: Record<string, unknown>): ObligationRecord {
+  const escrow = json.escrow;
+  const escrowValue =
+    escrow && typeof escrow === "object" && "value" in escrow ? asString((escrow as { value: unknown }).value) : asString(escrow);
   return {
     id,
-    seller: asString(field(json, "seller")),
-    title: asString(field(json, "title")),
-    detail: asString(field(json, "detail")),
-    price: asString(field(json, "price")),
-    kind: Number(field(json, "kind") ?? 0),
-    active: Boolean(field(json, "active")),
+    payer: asString(json.payer),
+    service: asString(json.service),
+    currency: asString(json.currency) || "JPY",
+    maxQuote: asString(json.max_quote),
+    acceptedQuote: asString(json.accepted_quote) || "0",
+    rateNum: asString(json.rate_num) || RATE_NUM.toString(),
+    rateDen: asString(json.rate_den) || RATE_DEN.toString(),
+    requireVerified: asBool(json.require_verified),
+    requireProof: asBool(json.require_proof),
+    merchant: asString(json.merchant),
+    merchantName: asString(json.merchant_name),
+    destination: asString(json.destination),
+    proof: asString(json.proof),
+    expiresAtMs: Number(json.expires_at_ms ?? 0),
+    status: Number(json.status ?? 0),
+    outcome: asString(json.outcome),
+    escrow: escrowValue,
   };
 }
 
@@ -106,11 +139,7 @@ async function objects(ids: string[]) {
 }
 
 async function events(eventType: string) {
-  const page = await sui().listEvents({
-    filter: { eventType },
-    limit: 50,
-    order: "descending",
-  });
+  const page = await sui().listEvents({ filter: { eventType }, limit: 50, order: "descending" });
   return page.events;
 }
 
@@ -118,38 +147,35 @@ async function settle(signer: Ed25519Keypair, tx: Transaction) {
   tx.setSender(signer.toSuiAddress());
   const bytes = await tx.build({ client: sui() });
   const signed = await signer.signTransaction(bytes);
+  return execute(bytes, [signed.signature]);
+}
+
+async function execute(transaction: Uint8Array, signatures: string[]) {
   const result = await sui().executeTransaction({
-    transaction: bytes,
-    signatures: [signed.signature],
+    transaction,
+    signatures,
     include: { effects: true },
   });
   if (result.$kind !== "Transaction") throw new Error(explain(result.FailedTransaction.status.error));
   if (!result.Transaction.status.success) throw new Error(explain(result.Transaction.status.error));
-  const full = await sui().getTransaction({
-    digest: result.Transaction.digest,
-    include: { effects: true, events: true },
-  });
-  if (full.$kind !== "Transaction") throw new Error(explain(full.FailedTransaction.status.error));
-  return full.Transaction;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      const full = await sui().getTransaction({
+        digest: result.Transaction.digest,
+        include: { effects: true, events: true },
+      });
+      if (full.$kind === "Transaction") return full.Transaction;
+    } catch (error) {
+      if (attempt === 11) throw new Error(explain(error));
+    }
+    await sleep(1000);
+  }
+  throw new Error("The transaction was submitted, but the fullnode has not indexed it yet.");
 }
 
-function receiptFrom(
-  tx: { digest: string; events?: { eventType: string; json: Record<string, unknown> | null }[] },
-  fallback: string,
-): TxReceipt {
-  const events = tx.events ?? [];
-  const find = (suffix: string) => events.find((event) => event.eventType.endsWith(suffix))?.json ?? null;
-  const created = find("::IntentCreated");
-  const listed = find("::ListingCreated");
-  const bought = find("::Purchased");
-  const badge = find("::BadgeMinted");
-  return {
-    digest: tx.digest || fallback,
-    intentId: created ? asString(created.intent_id) : undefined,
-    listingId: listed ? asString(listed.listing_id) : undefined,
-    badgeId: badge ? asString(badge.badge_id) : undefined,
-    voucher: bought ? tx.digest.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase() : undefined,
-  };
+function receiptFrom(tx: { digest: string; events?: { eventType: string; json: Record<string, unknown> | null }[] }): TxReceipt {
+  const created = tx.events?.find((event) => event.eventType.endsWith("::ObligationCreated"))?.json;
+  return { digest: tx.digest, obligationId: created ? asString(created.obligation_id) : undefined };
 }
 
 export async function getStatus(): Promise<ChainStatus> {
@@ -159,6 +185,7 @@ export async function getStatus(): Promise<ChainStatus> {
       mode: "local",
       packageId: null,
       usdcType: null,
+      merchantRegistryId: null,
       sponsorAddress: null,
       sponsorReady: false,
       referenceGasPrice: null,
@@ -179,6 +206,7 @@ export async function getStatus(): Promise<ChainStatus> {
     mode: deployed.network,
     packageId: deployed.packageId,
     usdcType: deployed.usdcType,
+    merchantRegistryId: deployed.merchantRegistryId,
     sponsorAddress: deployed.sponsorAddress,
     sponsorReady: Boolean(process.env.SPONSOR_SECRET_KEY),
     referenceGasPrice,
@@ -197,77 +225,52 @@ export async function getBalances(owner: string): Promise<BalanceSnapshot> {
   return { sui: suiBalance.balance.balance, usdc: usdcBalance.balance.balance };
 }
 
-export async function listIntents(): Promise<IntentRecord[]> {
-  if (chainMode() === "local") return localIntents();
+export async function listObligations(): Promise<ObligationRecord[]> {
+  if (chainMode() === "local") return localObligations();
   const deployed = deployment();
-  const created = await events(`${deployed.packageId}::intent::IntentCreated`);
-  const ids = created.map((event) => asString(event.json?.intent_id)).filter(Boolean);
+  const created = await events(`${deployed.packageId}::obligation::ObligationCreated`);
+  const ids = created.map((event) => asString(event.json?.obligation_id)).filter(Boolean);
   const fetched = await objects(ids);
   return fetched.flatMap((object) => {
     if (object instanceof Error || !object.json) return [];
-    return [parseIntent(object.objectId, object.json)];
+    return [parseObligation(object.objectId, object.json)];
   });
 }
 
-export async function getIntent(id: string): Promise<IntentRecord | null> {
-  if (chainMode() === "local") return localIntent(id);
+export async function getObligation(id: string): Promise<ObligationRecord | null> {
+  if (chainMode() === "local") return localObligation(id);
   try {
     const response = await sui().getObject({ objectId: id, include: { json: true } });
-    if (!response.object.json || !response.object.type?.includes("::intent::Intent")) return null;
-    return parseIntent(response.object.objectId, response.object.json);
+    if (!response.object.json || !response.object.type?.includes("::obligation::Obligation")) return null;
+    return parseObligation(response.object.objectId, response.object.json);
   } catch {
     return null;
   }
 }
 
-export async function listListings(): Promise<ListingRecord[]> {
-  if (chainMode() === "local") return localListings();
-  const deployed = deployment();
-  const created = await events(`${deployed.packageId}::market::ListingCreated`);
-  const ids = created.map((event) => asString(event.json?.listing_id)).filter(Boolean);
-  const fetched = await objects(ids);
-  return fetched.flatMap((object) => {
-    if (object instanceof Error || !object.json) return [];
-    return [parseListing(object.objectId, object.json)];
-  });
-}
-
-export async function listActivity(owner: string): Promise<ActivityRecord[]> {
-  if (chainMode() === "local") return localActivity();
-  const deployed = deployment();
-  const ownerLower = owner.toLowerCase();
-  const groups = await Promise.all([
-    events(`${deployed.packageId}::intent::IntentCreated`),
-    events(`${deployed.packageId}::intent::IntentAccepted`),
-    events(`${deployed.packageId}::intent::IntentClosed`),
-    events(`${deployed.packageId}::market::Purchased`),
-    events(`${deployed.packageId}::market::ListingCreated`),
-    events(`${deployed.packageId}::learn::BadgeMinted`),
-  ]);
-  const items: ActivityRecord[] = [];
-  for (const event of groups.flat()) {
-    const json = event.json ?? {};
-    const addresses = ["payer", "payee", "buyer", "seller", "learner"].map((key) => asString(json[key]).toLowerCase());
-    if (!addresses.includes(ownerLower)) continue;
-    let summary = "On-chain event";
-    if (event.eventType.endsWith("IntentCreated") && asString(json.payer).toLowerCase() === ownerLower) {
-      summary = `Locked a payment for ${asString(json.payee_name)}`;
-    } else if (event.eventType.endsWith("IntentAccepted") && asString(json.payee).toLowerCase() === ownerLower) {
-      summary = "Accepted a payment into this wallet";
-    } else if (event.eventType.endsWith("IntentAccepted")) {
-      summary = "Someone accepted your payment";
-    } else if (event.eventType.endsWith("IntentClosed")) {
-      summary = "Closed an intent and took the escrow back";
-    } else if (event.eventType.endsWith("Purchased") && asString(json.buyer).toLowerCase() === ownerLower) {
-      summary = "Bought a partner item";
-    } else if (event.eventType.endsWith("ListingCreated")) {
-      summary = `Listed ${asString(json.title)}`;
-    } else if (event.eventType.endsWith("BadgeMinted")) {
-      summary = "Minted a learner badge";
-    }
-    items.push({ id: `${event.transactionDigest}:${event.eventIndex}`, at: 0, summary, digest: event.transactionDigest });
+export async function listDesks(): Promise<{ desks: Desk[]; verified: string[] }> {
+  const local = chainMode() === "local";
+  const desks = directory(local);
+  if (local) {
+    return { desks, verified: await localVerified() };
   }
-  return items.slice(0, 20);
+  try {
+    const verifiedEvents = await events(`${deployment().packageId}::merchant::MerchantVerified`);
+    const names = new Map<string, string>();
+    for (const event of verifiedEvents) {
+      const address = asString(event.json?.merchant).toLowerCase();
+      if (address) names.set(address, asString(event.json?.name));
+    }
+    return {
+      desks: desks.map((desk) => ({
+        ...desk,
+        verified: desk.address ? names.has(desk.address.toLowerCase()) : false,
+      })),
+      verified: [...names.keys()],
+    };
+  } catch {
+    return { desks, verified: [] };
+  }
 }
 
 export async function bootstrap(address: string) {
@@ -291,56 +294,31 @@ export async function bootstrap(address: string) {
     }
   }
   const mid = await getBalances(address);
-  if (BigInt(mid.usdc) < 10_000_000n) {
+  if (BigInt(mid.usdc) < 25_000_000n) {
     const tx = new Transaction();
     tx.moveCall({
       target: `${deployed.packageId}::usdc::drip`,
-      arguments: [tx.object(deployed.mintHubId), tx.pure.address(address), tx.pure.u64(20_000_000)],
+      arguments: [tx.object(deployed.mintHubId), tx.pure.address(address), tx.pure.u64(60_000_000)],
     });
     await settle(key, tx);
-    await waitForCoin(address, deployed.usdcType, 10_000_000n);
+    await waitForCoin(address, deployed.usdcType, 20_000_000n);
   }
   return getBalances(address);
 }
 
-export async function acceptIntent(input: { intentId: string; secretHex: string; payee: string }) {
-  if (chainMode() === "local") return localAccept(input);
-  const deployed = deployment();
-  const current = await getIntent(input.intentId);
-  if (!current) throw new Error("No intent with that id.");
-  if (current.status === STATUS_ACCEPTED && current.payee.toLowerCase() === input.payee.toLowerCase()) {
-    return { digest: "already-accepted", intentId: current.id };
-  }
-  if (current.status !== STATUS_PENDING) throw new Error("This intent is no longer open.");
-  const object = await sui().getObject({ objectId: input.intentId, include: { json: true } });
-  const expected = claimHashToHex(object.object.json?.claim_hash);
-  const actual = bytesToHex(hashSecret(hexToBytes(input.secretHex)));
-  if (expected && actual !== expected) throw new Error("That code does not match this intent.");
-
-  const tx = new Transaction();
-  tx.moveCall({
-    target: `${deployed.packageId}::intent::accept`,
-    typeArguments: [deployed.usdcType],
-    arguments: [
-      tx.object(input.intentId),
-      tx.pure.vector("u8", hexToBytes(input.secretHex)),
-      tx.pure.address(input.payee),
-      tx.object.clock(),
-    ],
-  });
-  tx.transferObjects([coinWithBalance({ balance: 100_000_000n })], input.payee);
-  const done = await settle(sponsor(), tx);
-  await waitForCoin(input.payee, deployed.usdcType, BigInt(current.amount));
-  return { digest: done.digest, intentId: input.intentId };
-}
-
 type BuildInput =
-  | { action: "create"; sender: string; payeeName: string; purpose: string; amount: string; expiresAtMs: number; claimHashHex: string }
-  | { action: "cancel"; sender: string; intentId: string }
-  | { action: "reclaim"; sender: string; intentId: string }
-  | { action: "buy"; sender: string; listingId: string; price: string }
-  | { action: "list"; sender: string; title: string; detail: string; price: string }
-  | { action: "badge"; sender: string };
+  | { action: "create"; sender: string; service: string; maxQuote: string; requireVerified: boolean; requireProof: boolean; expiresAtMs: number }
+  | { action: "cancel"; sender: string; obligationId: string }
+  | { action: "reclaim"; sender: string; obligationId: string }
+  | { action: "release"; sender: string; obligationId: string }
+  | { action: "revise"; sender: string; obligationId: string; quote: string }
+  | { action: "redirect"; sender: string; obligationId: string; destination: string }
+  | { action: "accept"; sender: string; obligationId: string; quote: string; merchantName: string }
+  | { action: "proof"; sender: string; obligationId: string; proof: string }
+  | { action: "decline"; sender: string; obligationId: string }
+  | { action: "verify"; sender: string; merchant: string; merchantName: string }
+  | { action: "contact"; obligationId: string; merchantId: string }
+  | { action: "prove"; obligationId: string; merchantId: string; proof: string };
 
 function assertText(value: string, label: string, max: number) {
   const trimmed = value.trim();
@@ -349,86 +327,179 @@ function assertText(value: string, label: string, max: number) {
 }
 
 export async function act(input: BuildInput): Promise<TxReceipt> {
-  if (chainMode() === "local") {
-    if (input.action === "create") return localCreate(input);
-    if (input.action === "cancel") return localCancel(input.sender, input.intentId);
-    if (input.action === "reclaim") return localReclaim(input.sender, input.intentId);
-    if (input.action === "buy") return localBuy(input.sender, input.listingId, input.price);
-    if (input.action === "list") return localList(input.sender, input.title, input.detail, input.price);
-    return localBadge(input.sender);
-  }
-  throw new Error("This network needs a signature. Build the transaction first.");
+  if (chainMode() !== "local") throw new Error("This network needs a signature. Build the transaction first.");
+  if (input.action === "create") return localCreate(input);
+  if (input.action === "cancel") return localCancel(input);
+  if (input.action === "reclaim") return localReclaim(input);
+  if (input.action === "release") return localRelease(input);
+  if (input.action === "revise") return localRevise();
+  if (input.action === "redirect") return localRedirect();
+  if (input.action === "accept") return localAccept(input);
+  if (input.action === "proof") return localProof(input);
+  if (input.action === "decline") return localDecline(input);
+  if (input.action === "verify") return localVerify(input.merchant);
+  if (input.action === "contact") return localContact(input);
+  return localProve(input);
 }
 
 export async function buildTransaction(input: BuildInput) {
   if (chainMode() === "local") throw new Error("Preview mode does not build chain transactions.");
+  if (!("sender" in input)) throw new Error("This action is signed on the server.");
   const deployed = deployment();
   const tx = new Transaction();
   tx.setSender(input.sender);
+  const usdc = deployed.usdcType;
+  const registry = tx.object(deployed.merchantRegistryId);
   if (input.action === "create") {
-    const name = assertText(input.payeeName, "Name", 48);
-    const purpose = assertText(input.purpose, "Purpose", 180);
-    const amount = BigInt(input.amount);
-    if (amount <= 0n || amount > 100_000_000n) throw new Error("Amount must be between $0.01 and $100.");
+    const service = assertText(input.service, "Service", 180);
+    const quote = BigInt(input.maxQuote);
+    const escrow = quoteToMicro(quote);
+    if (escrow <= 0n) throw new Error("Amount must be a whole number of yen, up to ¥1,000,000.");
     tx.moveCall({
-      target: `${deployed.packageId}::intent::create`,
-      typeArguments: [deployed.usdcType],
+      target: `${deployed.packageId}::obligation::create`,
+      typeArguments: [usdc],
       arguments: [
-        coinWithBalance({ type: deployed.usdcType, balance: amount }),
-        tx.pure.string(name),
-        tx.pure.string(purpose),
+        coinWithBalance({ type: usdc, balance: escrow }),
+        tx.pure.string(service),
+        tx.pure.string("JPY"),
+        tx.pure.u64(quote),
+        tx.pure.u64(RATE_NUM),
+        tx.pure.u64(RATE_DEN),
+        tx.pure.bool(input.requireVerified),
+        tx.pure.bool(input.requireProof),
         tx.pure.u64(input.expiresAtMs),
-        tx.pure.vector("u8", hexToBytes(input.claimHashHex)),
         tx.object.clock(),
       ],
     });
-  } else if (input.action === "cancel" || input.action === "reclaim") {
+  } else if (input.action === "cancel") {
     tx.moveCall({
-      target: `${deployed.packageId}::intent::${input.action === "cancel" ? "cancel" : "reclaim_expired"}`,
-      typeArguments: [deployed.usdcType],
-      arguments:
-        input.action === "cancel"
-          ? [tx.object(input.intentId)]
-          : [tx.object(input.intentId), tx.object.clock()],
+      target: `${deployed.packageId}::obligation::cancel`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId)],
     });
-  } else if (input.action === "buy") {
+  } else if (input.action === "reclaim") {
     tx.moveCall({
-      target: `${deployed.packageId}::market::buy`,
-      typeArguments: [deployed.usdcType],
-      arguments: [tx.object(input.listingId), coinWithBalance({ type: deployed.usdcType, balance: BigInt(input.price) })],
+      target: `${deployed.packageId}::obligation::reclaim`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId), tx.object.clock()],
     });
-  } else if (input.action === "list") {
+  } else if (input.action === "release") {
     tx.moveCall({
-      target: `${deployed.packageId}::market::list`,
+      target: `${deployed.packageId}::obligation::release`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId), registry, tx.object.clock()],
+    });
+  } else if (input.action === "revise") {
+    tx.moveCall({
+      target: `${deployed.packageId}::obligation::revise_price`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId), tx.pure.u64(BigInt(input.quote))],
+    });
+  } else if (input.action === "redirect") {
+    tx.moveCall({
+      target: `${deployed.packageId}::obligation::redirect`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId), tx.pure.address(input.destination)],
+    });
+  } else {
+    throw new Error("That action is sponsored from the merchant side.");
+  }
+  const bytes = await tx.build({ client: sui() });
+  return { bytes: Buffer.from(bytes).toString("base64") };
+}
+
+async function prepareMerchant(input: Extract<BuildInput, { action: "accept" | "proof" | "decline" }>) {
+  const deployed = deployment();
+  const tx = new Transaction();
+  tx.setSender(input.sender);
+  tx.setGasOwner(sponsor().toSuiAddress());
+  const usdc = deployed.usdcType;
+  if (input.action === "accept") {
+    tx.moveCall({
+      target: `${deployed.packageId}::obligation::accept`,
+      typeArguments: [usdc],
       arguments: [
-        tx.pure.string(assertText(input.title, "Title", 64)),
-        tx.pure.string(assertText(input.detail, "Description", 240)),
-        tx.pure.u64(input.price),
+        tx.object(input.obligationId),
+        tx.object(deployed.merchantRegistryId),
+        tx.pure.u64(BigInt(input.quote)),
+        tx.pure.string(assertText(input.merchantName, "Name", 48)),
+        tx.object.clock(),
       ],
+    });
+  } else if (input.action === "proof") {
+    tx.moveCall({
+      target: `${deployed.packageId}::obligation::submit_proof`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId), tx.pure.string(assertText(input.proof, "Proof", 180))],
     });
   } else {
     tx.moveCall({
-      target: `${deployed.packageId}::learn::mint_badge`,
-      arguments: [tx.object(deployed.badgeRegistryId), tx.object.clock()],
+      target: `${deployed.packageId}::obligation::decline`,
+      typeArguments: [usdc],
+      arguments: [tx.object(input.obligationId)],
     });
   }
   const bytes = await tx.build({ client: sui() });
   return { bytes: Buffer.from(bytes).toString("base64") };
 }
 
+export async function prepareSponsored(input: BuildInput) {
+  if (chainMode() === "local") throw new Error("Preview mode does not build chain transactions.");
+  if (input.action !== "accept" && input.action !== "proof" && input.action !== "decline") {
+    throw new Error("That action is not sponsored.");
+  }
+  return prepareMerchant(input);
+}
+
+export async function cosign(bytes: string, signature: string) {
+  const transaction = Uint8Array.from(Buffer.from(bytes, "base64"));
+  const sponsorSig = await sponsor().signTransaction(transaction);
+  const done = await execute(transaction, [signature, sponsorSig.signature]);
+  return receiptFrom(done);
+}
+
 export async function submitTransaction(bytes: string, signature: string) {
   const transaction = Uint8Array.from(Buffer.from(bytes, "base64"));
-  const result = await sui().executeTransaction({
-    transaction,
-    signatures: [signature],
-    include: { effects: true },
+  const done = await execute(transaction, [signature]);
+  return receiptFrom(done);
+}
+
+export async function verifyMerchant(merchant: string, merchantName: string) {
+  if (chainMode() === "local") return localVerify(merchant);
+  const deployed = deployment();
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${deployed.packageId}::merchant::verify`,
+    arguments: [tx.object(deployed.merchantRegistryId), tx.pure.address(merchant), tx.pure.string(assertText(merchantName, "Name", 48))],
   });
-  if (result.$kind !== "Transaction") throw new Error(explain(result.FailedTransaction.status.error));
-  if (!result.Transaction.status.success) throw new Error(explain(result.Transaction.status.error));
-  const full = await sui().getTransaction({
-    digest: result.Transaction.digest,
-    include: { events: true, effects: true },
-  });
-  if (full.$kind !== "Transaction") throw new Error(explain(full.FailedTransaction.status.error));
-  return receiptFrom(full.Transaction, result.Transaction.digest);
+  const done = await settle(sponsor(), tx);
+  return receiptFrom(done);
+}
+
+export async function agentAct(input: Extract<BuildInput, { action: "contact" | "prove" }>) {
+  if (chainMode() === "local") return act(input);
+  const desk = deskById(input.merchantId, false);
+  if (!desk || isZero(desk.address)) throw new Error("That desk is not published on this network yet.");
+  const key = merchantSecret(input.merchantId);
+  if (key.toSuiAddress().toLowerCase() !== desk.address.toLowerCase()) {
+    throw new Error("The published desk address does not match the server key.");
+  }
+  const prepared =
+    input.action === "contact"
+      ? await prepareMerchant({
+          action: "accept",
+          sender: desk.address,
+          obligationId: input.obligationId,
+          quote: desk.ask,
+          merchantName: desk.name,
+        })
+      : await prepareMerchant({
+          action: "proof",
+          sender: desk.address,
+          obligationId: input.obligationId,
+          proof: input.proof,
+        });
+  const transaction = Uint8Array.from(Buffer.from(prepared.bytes, "base64"));
+  const signed = await key.signTransaction(transaction);
+  return cosign(prepared.bytes, signed.signature);
 }

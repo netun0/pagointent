@@ -1,21 +1,22 @@
-# Intenses
+# PagoIntent
 
-Pay anyone in crypto, even if they don’t have a wallet. Intenses locks USDC in a Sui escrow, shows a QR code, and creates the payee’s wallet the moment they accept.
+A programmable obligation layer for agentic commerce on Sui.
 
-An intent reads like this: pay Mark up to $2 for lunch today, in USDC, if he accepts. Mark scans the code, sets a password, and the coins are already at a new Sui address. The private key is encrypted in the browser with that password. Gas for the accept transaction is sponsored, so he does not need SUI — or a wallet app — beforehand.
+Orbital moves money. Yodl pays a merchant who already has a local rail. PagoIntent decides what must be true before an autonomous agent is allowed to pay.
 
-Built for the ETHGlobal Sui track.
+A user can say: buy this service for up to ¥3,000, only from a verified merchant, and only release the money when proof of delivery arrives. PagoIntent contacts a merchant, creates a Sui key for them if they do not have one, locks test USDC in a shared escrow, and releases it only when the predicate holds.
+
+If the merchant changes the price, the payment is aimed at another address, delivery never arrives, or nobody accepts before the deadline, the funds are not released. They return to the payer.
 
 ## What is on chain
 
-The Move package in `move/intenses` does four things:
+The Move package in `move/pago` does three things:
 
-- `usdc` — a 6-decimal test coin and a shared mint hub. On mainnet this would be native Circle USDC.
-- `intent` — a shared escrow. Create locks the coin. Accept checks a Blake2b-256 claim secret from the QR and pays a new address. Cancel and expiry return the funds to the payer.
-- `market` — flagship goods plus items a payee lists. Buying transfers the test USDC to the seller.
-- `learn` — one non-transferable learner badge per address.
+- `usdc` — a 6-decimal test coin and a shared mint hub. The obligation is denominated in yen. This coin is only the settlement asset, at a rate frozen on the object (¥150 = 1 test USDC). It is not Circle USDC.
+- `merchant` — a shared verification registry. A verified merchant also receives a soulbound credential (`key`, not `store`).
+- `obligation` — a shared escrow. `create` locks the cap. `accept` freezes the quote and binds the destination to the accepting address, and refuses an unverified merchant when required. `submit_proof` records delivery. `release` is permissionless and succeeds only when every condition holds, paying the bound address and refunding the unused cap. `revise_price` and `redirect` abort. Cancel, decline, and expiry return the escrow.
 
-The app talks to Sui through `@mysten/sui`: gRPC reads (`getObject`, `getBalance`, `listEvents`, `getReferenceGasPrice`), sponsored transactions for the accept path, and user-signed transactions for create, buy, list, and the badge.
+The app uses `@mysten/sui` gRPC. The payer signs lock, cancel, reclaim, and release. Merchant accept and proof are sponsored: the merchant is the sender, the sponsor pays gas, so a new desk does not need SUI.
 
 ## Run it
 
@@ -26,7 +27,7 @@ npm run dev
 
 Open [http://127.0.0.1:43123](http://127.0.0.1:43123).
 
-If `src/lib/sui/deployed.json` has a package id and `SPONSOR_SECRET_KEY` is set, the app settles on that Sui network. Otherwise it uses a local preview ledger with the same rules, so the screens still work. On Vercel, add `SPONSOR_SECRET_KEY` to use the published package; leave it empty for the preview ledger.
+If `src/lib/sui/deployed.json` has a package id and a merchant registry, and `SPONSOR_SECRET_KEY` is set, the app settles on that Sui network. Otherwise it uses a local preview ledger with the same rules.
 
 ## Publish the package
 
@@ -38,16 +39,8 @@ npm run move:build
 SUI_NETWORK=devnet npm run chain:setup
 ```
 
-`chain:setup` writes a sponsor key to `.env.local`, asks the faucet for SUI, publishes the package, and records the object ids. Use `SUI_NETWORK=testnet` when the testnet faucet is available. Restart `npm run dev` after setup so Next.js loads the new key.
+`chain:setup` publishes the package, verifies Harbor Bindery and Kanda Desk, leaves Night Window unverified, and writes their public addresses to `src/lib/sui/merchants.json`. Private keys stay in `.env.local` and `data/merchant-secrets.json`. Do not commit those. Restart `npm run dev` after setup.
+
+Set `FORCE_PUBLISH=1` to publish again when a package is already recorded.
 
 The demo coin is not Circle USDC. Do not send real funds to these addresses.
-
-## The flow
-
-1. **Pay** creates a demo payer, funds it with SUI and test USDC, and locks an intent.
-2. The QR encodes `/i/<id>?k=<secret>`. The secret is not stored on chain — only its hash.
-3. **Scan / accept** generates an Ed25519 key, encrypts it with the payee’s password (PBKDF2 + AES-GCM), and the sponsor submits `intent::accept` plus a small SUI stipend.
-4. **Learn** is five short lessons. Finishing them mints a badge the payee signs for.
-5. **Market** sells the seeded partner goods and lets the payee list their own.
-
-The encrypted backup (`intenses-wallet.json`) can be imported on another browser. The password is the only way to decrypt it.

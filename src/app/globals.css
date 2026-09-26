@@ -50,24 +50,24 @@
 }
 
 :root {
-  --background: #f3ecdf;
-  --foreground: #1c1612;
-  --card: #fffaf3;
-  --card-foreground: #1c1612;
-  --popover: #fffaf3;
-  --popover-foreground: #1c1612;
-  --primary: #1c1612;
-  --primary-foreground: #f7f1e6;
-  --secondary: #efe4d2;
-  --secondary-foreground: #1c1612;
-  --muted: #efe4d2;
-  --muted-foreground: #6f6256;
-  --accent: #f6ddd4;
-  --accent-foreground: #8d2c18;
-  --destructive: #d94a2b;
-  --border: #e4d5c0;
-  --input: #e4d5c0;
-  --ring: #d94a2b;
+  --background: #e7ece4;
+  --foreground: #14201c;
+  --card: #f6f7f2;
+  --card-foreground: #14201c;
+  --popover: #f6f7f2;
+  --popover-foreground: #14201c;
+  --primary: #14342c;
+  --primary-foreground: #f4f7f2;
+  --secondary: #dce5dc;
+  --secondary-foreground: #14201c;
+  --muted: #e1e6de;
+  --muted-foreground: #5c6b64;
+  --accent: #d5e6dc;
+  --accent-foreground: #14342c;
+  --destructive: #8d2e2e;
+  --border: #c9d4cb;
+  --input: #c9d4cb;
+  --ring: #1f6b52;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -124,53 +124,12 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image: radial-gradient(#e7dcc9 0.7px, transparent 0.7px);
-    background-size: 16px 16px;
   }
   html {
     @apply font-sans;
   }
 }
 
-.font-serif {
-  font-family: var(--font-serif);
-}
-
-.ticket {
-  background: #fffaf3;
-  border: 1px solid #e4d5c0;
-  border-radius: 22px;
-  box-shadow: 0 24px 60px rgba(48, 28, 12, 0.08);
-}
-
-.ticket::before,
-.ticket::after {
-  content: "";
-  position: absolute;
-  top: 58%;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: #f3ecdf;
-  border: 1px solid #e4d5c0;
-}
-
-.ticket::before {
-  left: -12px;
-}
-
-.ticket::after {
-  right: -12px;
-}
-
-.stamp {
-  border: 2px solid #d94a2b;
-  color: #d94a2b;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transform: rotate(-8deg);
+.font-mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
 }

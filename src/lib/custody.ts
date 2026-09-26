@@ -1,10 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 
-const PAYER_KEY = "intenses.payer";
-const VAULT_KEY = "intenses.vault";
-const SECRETS_KEY = "intenses.secrets";
-const LESSONS_KEY = "intenses.lessons";
+const PAYER_KEY = "pagointent.payer";
+const VAULT_KEY = "pagointent.vault";
 const ITERATIONS = 120_000;
 
 export type VaultFile = {
@@ -111,10 +109,6 @@ export function forgetVault() {
   emit();
 }
 
-export function readPayerSecret() {
-  return localStorage.getItem(PAYER_KEY);
-}
-
 export function writePayerSecret(secret: string) {
   localStorage.setItem(PAYER_KEY, secret);
   payerSecretCache = undefined;
@@ -143,60 +137,4 @@ export function usePayer() {
 
 export function useVault() {
   return useSyncExternalStore(subscribe, readVault, () => null);
-}
-
-let lessonRaw = "";
-let lessonSnapshot: string[] = [];
-
-function readLessonSnapshot() {
-  const raw = localStorage.getItem(LESSONS_KEY) ?? "[]";
-  if (raw === lessonRaw) return lessonSnapshot;
-  lessonRaw = raw;
-  lessonSnapshot = JSON.parse(raw) as string[];
-  return lessonSnapshot;
-}
-
-export function useLessons() {
-  return useSyncExternalStore(subscribe, readLessonSnapshot, () => lessonSnapshot);
-}
-
-export function useOrigin() {
-  return useSyncExternalStore(
-    () => () => undefined,
-    () => window.location.origin,
-    () => "",
-  );
-}
-
-export function payerFromStorage() {
-  const secret = readPayerSecret();
-  if (!secret) return null;
-  const keypair = Ed25519Keypair.fromSecretKey(secret);
-  return { secret, address: keypair.toSuiAddress(), keypair };
-}
-
-export function rememberClaim(intentId: string, secretHex: string) {
-  const current = JSON.parse(localStorage.getItem(SECRETS_KEY) ?? "{}") as Record<string, string>;
-  current[intentId] = secretHex;
-  localStorage.setItem(SECRETS_KEY, JSON.stringify(current));
-  emit();
-}
-
-export function useClaim(intentId: string) {
-  return useSyncExternalStore(subscribe, () => recallClaim(intentId), () => null);
-}
-
-export function recallClaim(intentId: string) {
-  const current = JSON.parse(localStorage.getItem(SECRETS_KEY) ?? "{}") as Record<string, string>;
-  return current[intentId] ?? null;
-}
-
-export function readLessons() {
-  return JSON.parse(localStorage.getItem(LESSONS_KEY) ?? "[]") as string[];
-}
-
-export function writeLessons(ids: string[]) {
-  localStorage.setItem(LESSONS_KEY, JSON.stringify(ids));
-  lessonRaw = "";
-  emit();
 }

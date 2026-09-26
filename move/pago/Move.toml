@@ -1,9 +1,9 @@
 [package]
-name = "intenses"
+name = "pago"
 edition = "2024"
 license = "Apache-2.0"
 
 [dependencies]
 
 [addresses]
-intenses = "0x0"
+pago = "0x0"

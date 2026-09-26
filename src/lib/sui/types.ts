@@ -4,6 +4,7 @@ export type ChainStatus = {
   mode: NetworkName;
   packageId: string | null;
   usdcType: string | null;
+  merchantRegistryId: string | null;
   sponsorAddress: string | null;
   sponsorReady: boolean;
   referenceGasPrice: string | null;
@@ -12,32 +13,35 @@ export type ChainStatus = {
   rpcError: string | null;
 };
 
-export type IntentRecord = {
+export type ObligationRecord = {
   id: string;
   payer: string;
-  payeeName: string;
-  purpose: string;
-  amount: string;
+  service: string;
+  currency: string;
+  maxQuote: string;
+  acceptedQuote: string;
+  rateNum: string;
+  rateDen: string;
+  requireVerified: boolean;
+  requireProof: boolean;
+  merchant: string;
+  merchantName: string;
+  destination: string;
+  proof: string;
   expiresAtMs: number;
   status: number;
-  payee: string;
+  outcome: string;
+  escrow: string;
 };
 
-export type ListingRecord = {
+export type Desk = {
   id: string;
-  seller: string;
-  title: string;
-  detail: string;
-  price: string;
-  kind: number;
-  active: boolean;
-};
-
-export type ActivityRecord = {
-  id: string;
-  at: number;
-  summary: string;
-  digest?: string;
+  name: string;
+  city: string;
+  service: string;
+  ask: string;
+  verified: boolean;
+  address: string;
 };
 
 export type BalanceSnapshot = {
@@ -47,13 +51,13 @@ export type BalanceSnapshot = {
 
 export type TxReceipt = {
   digest: string;
-  intentId?: string;
-  listingId?: string;
-  badgeId?: string;
-  voucher?: string;
+  obligationId?: string;
 };
 
-export const STATUS_PENDING = 0;
-export const STATUS_ACCEPTED = 1;
-export const STATUS_CANCELLED = 2;
-export const STATUS_EXPIRED = 3;
+export const OFFERED = 0;
+export const ACCEPTED = 1;
+export const RELEASED = 2;
+export const RETURNED = 3;
+
+export const RATE_NUM = 1_000_000n;
+export const RATE_DEN = 150n;

@@ -1,6 +1,7 @@
-/// Testnet stand-in for native USDC. Not issued by Circle.
-/// On mainnet, intents escrow `0x...::usdc::USDC` from Circle instead of this type.
-module intenses::usdc;
+/// Demo settlement coin with 6 decimals. Not issued by Circle.
+/// The obligation itself is denominated in the quote currency (yen in the demo).
+/// This coin is only the locked settlement asset, at a rate frozen on the obligation.
+module pago::usdc;
 
 use std::string::{Self, String};
 use sui::coin::{Self, TreasuryCap};
@@ -11,7 +12,6 @@ const ELimit: u64 = 0;
 
 public struct USDC has drop {}
 
-/// Shared mint counter for the hackathon demo. Each call caps at 100 test USDC.
 public struct MintHub has key {
     id: UID,
     cap: TreasuryCap<USDC>,
@@ -22,8 +22,8 @@ fun init(otw: USDC, ctx: &mut TxContext) {
         otw,
         6,
         string::utf8(b"USDC"),
-        string::utf8(b"Intenses Test USD"),
-        string::utf8(b"Testnet stand-in for native USDC on Sui. Not issued by Circle."),
+        string::utf8(b"PagoIntent Test USD"),
+        string::utf8(b"Settlement asset for PagoIntent obligations. Not issued by Circle."),
         string::utf8(b"https://cryptologos.cc/logos/usd-coin-usdc-logo.png"),
         ctx,
     );

@@ -6,7 +6,7 @@ export type Deployment = {
   network: "devnet" | "testnet";
   packageId: string;
   mintHubId: string;
-  badgeRegistryId: string;
+  merchantRegistryId: string;
   usdcType: string;
   upgradeCapId: string;
   sponsorAddress: string;
@@ -17,7 +17,7 @@ const empty: Deployment = {
   network: "devnet",
   packageId: "",
   mintHubId: "",
-  badgeRegistryId: "",
+  merchantRegistryId: "",
   usdcType: "",
   upgradeCapId: "",
   sponsorAddress: "",
@@ -34,8 +34,9 @@ export function deployment(): Deployment {
 }
 
 export function chainMode(): NetworkName {
-  if (!deployment().packageId || !process.env.SPONSOR_SECRET_KEY) return "local";
-  return deployment().network;
+  const deployed = deployment();
+  if (!deployed.packageId || !deployed.merchantRegistryId || !process.env.SPONSOR_SECRET_KEY) return "local";
+  return deployed.network;
 }
 
 export function rpcUrl(network: Deployment["network"]) {

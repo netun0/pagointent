@@ -43,5 +43,5 @@ data/
 next-env.d.ts
 
 # generated Move artifacts and local scratch
-/move/intenses/build
+/move/pago/build
 /agent-tools

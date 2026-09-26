@@ -1,29 +1,31 @@
 import type { Metadata } from "next";
-import { Fraunces, Outfit } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Shell } from "@/components/shell";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const outfit = Outfit({
+const sans = IBM_Plex_Sans({
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   variable: "--font-outfit",
 });
 
-const fraunces = Fraunces({
+const mono = IBM_Plex_Mono({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  weight: ["400", "500"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
-  title: "Intenses — pay anyone, even without a wallet",
+  title: "PagoIntent — autonomous payments, only when the terms are true",
   description:
-    "Payment intents on Sui. Lock USDC, share a QR code, and a wallet is created the moment they accept.",
+    "A programmable obligation layer for agentic commerce on Sui. Lock funds, and release them only when the merchant, price, destination, and proof of delivery all hold.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${outfit.variable} ${fraunces.variable} h-full antialiased`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
       <body className="min-h-full">
         <ThemeProvider attribute="class" forcedTheme="light" enableSystem={false}>
           <Shell>{children}</Shell>

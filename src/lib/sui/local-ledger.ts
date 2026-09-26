@@ -1,59 +1,44 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { bytesToHex, hashSecret, hexToBytes } from "@/lib/sui/hash";
+import { deskById, directory } from "@/lib/desks";
+import { quoteToMicro } from "@/lib/sui/format";
 import {
-  STATUS_ACCEPTED,
-  STATUS_CANCELLED,
-  STATUS_EXPIRED,
-  STATUS_PENDING,
-  type ActivityRecord,
+  ACCEPTED,
+  OFFERED,
+  RATE_DEN,
+  RATE_NUM,
+  RELEASED,
+  RETURNED,
   type BalanceSnapshot,
-  type IntentRecord,
-  type ListingRecord,
+  type ObligationRecord,
   type TxReceipt,
 } from "@/lib/sui/types";
 
-type StoredIntent = IntentRecord & { claimHash: string };
 type Ledger = {
   balances: Record<string, BalanceSnapshot>;
-  intents: StoredIntent[];
-  listings: ListingRecord[];
-  badges: string[];
-  activity: ActivityRecord[];
+  obligations: ObligationRecord[];
+  verified: string[];
 };
 
 const preferredPath = process.env.LEDGER_DIR
   ? path.join(process.env.LEDGER_DIR, "ledger.json")
   : path.join(process.cwd(), "data", "ledger.json");
-const fallbackPath = path.join("/tmp", "intenses", "ledger.json");
+const fallbackPath = path.join("/tmp", "pagointent", "ledger.json");
 let activePath = preferredPath;
 let queue: Promise<unknown> = Promise.resolve();
 
 function id() {
-  return `0x${randomBytes(32).toString("hex")}`;
-}
-
-function flagship(): ListingRecord[] {
-  const seller = `0x${"c0".repeat(32)}`;
-  return [
-    ["Oat latte", "Corner Cup. A counter that gets paid in USDC without opening an exchange account.", "1500000", "11"],
-    ["Talk time", "Airtime Desk. A $2 top-up. The demo prints a voucher once the payment settles.", "2000000", "22"],
-    ["Chili crisp", "Night Market. A jar, fulfilled by a flagship partner once the payment settles.", "3000000", "33"],
-    ["Day pass", "Paper Route. One transit day. The kind of purchase that used to need a bank card.", "1250000", "44"],
-  ].map(([title, detail, price, tag]) => ({
-    id: `0x${tag.repeat(32)}`,
-    seller,
-    title,
-    detail,
-    price,
-    kind: 0,
-    active: true,
-  }));
+  return `preview-${randomBytes(8).toString("hex")}`;
 }
 
 function emptyLedger(): Ledger {
-  return { balances: {}, intents: [], listings: flagship(), badges: [], activity: [] };
+  const desks = directory(true);
+  return {
+    balances: {},
+    obligations: [],
+    verified: desks.filter((desk) => desk.verified).map((desk) => desk.address.toLowerCase()),
+  };
 }
 
 async function readLedger(): Promise<Ledger> {
@@ -61,9 +46,10 @@ async function readLedger(): Promise<Ledger> {
     try {
       const ledger = JSON.parse(await readFile(candidate, "utf8")) as Ledger;
       activePath = candidate;
+      if (!ledger.verified) ledger.verified = emptyLedger().verified;
       return ledger;
     } catch {
-      // Try the next location. A missing file means a fresh preview ledger.
+      // A missing file starts a fresh preview ledger.
     }
   }
   return emptyLedger();
@@ -95,185 +81,225 @@ function withLedger<T>(fn: (ledger: Ledger) => T): Promise<T> {
   return run;
 }
 
-function bucket(ledger: Ledger, address: string) {
-  if (!ledger.balances[address]) ledger.balances[address] = { sui: "0", usdc: "0" };
-  return ledger.balances[address];
+function balance(ledger: Ledger, owner: string): BalanceSnapshot {
+  return ledger.balances[owner.toLowerCase()] ?? { sui: "0", usdc: "0" };
 }
 
-function credit(balance: BalanceSnapshot, key: keyof BalanceSnapshot, amount: bigint) {
-  balance[key] = (BigInt(balance[key]) + amount).toString();
-}
-
-function debit(balance: BalanceSnapshot, key: keyof BalanceSnapshot, amount: bigint, label: string) {
-  const current = BigInt(balance[key]);
-  if (current < amount) throw new Error(`Not enough ${label} in this preview wallet.`);
-  balance[key] = (current - amount).toString();
-}
-
-function note(ledger: Ledger, summary: string): TxReceipt {
-  const digest = `preview-${randomBytes(6).toString("hex")}`;
-  ledger.activity.unshift({ id: digest, at: Date.now(), summary, digest });
-  ledger.activity = ledger.activity.slice(0, 40);
-  return { digest };
-}
-
-function publicIntent(intent: StoredIntent): IntentRecord {
-  return {
-    id: intent.id,
-    payer: intent.payer,
-    payeeName: intent.payeeName,
-    purpose: intent.purpose,
-    amount: intent.amount,
-    expiresAtMs: intent.expiresAtMs,
-    status: intent.status,
-    payee: intent.payee,
+function credit(ledger: Ledger, owner: string, usdc: bigint, sui = 0n) {
+  const current = balance(ledger, owner);
+  ledger.balances[owner.toLowerCase()] = {
+    sui: (BigInt(current.sui) + sui).toString(),
+    usdc: (BigInt(current.usdc) + usdc).toString(),
   };
 }
 
-export function localBalances(address: string) {
-  return withLedger((ledger) => ({ ...bucket(ledger, address) }));
+function debitUsdc(ledger: Ledger, owner: string, amount: bigint) {
+  const current = balance(ledger, owner);
+  if (BigInt(current.usdc) < amount) throw new Error("The wallet does not have the right amount of test USDC.");
+  ledger.balances[owner.toLowerCase()] = {
+    sui: current.sui,
+    usdc: (BigInt(current.usdc) - amount).toString(),
+  };
 }
 
-export function localIntents() {
-  return withLedger((ledger) => ledger.intents.map(publicIntent));
+function find(ledger: Ledger, obligationId: string) {
+  const obligation = ledger.obligations.find((item) => item.id === obligationId);
+  if (!obligation) throw new Error("No obligation with that id.");
+  return obligation;
 }
 
-export function localIntent(id: string) {
-  return withLedger((ledger) => {
-    const intent = ledger.intents.find((item) => item.id === id);
-    return intent ? publicIntent(intent) : null;
-  });
+function receipt(obligationId?: string): TxReceipt {
+  return { digest: `preview-${randomBytes(6).toString("hex")}`, obligationId };
 }
 
-export function localListings() {
-  return withLedger((ledger) => ledger.listings);
+export function localVerified() {
+  return withLedger((ledger) => ledger.verified);
 }
 
-export function localActivity() {
-  return withLedger((ledger) => ledger.activity.slice(0, 20));
+export function localBalances(owner: string) {
+  return withLedger((ledger) => balance(ledger, owner));
+}
+
+export function localObligations() {
+  return withLedger((ledger) => ledger.obligations);
+}
+
+export function localObligation(id: string) {
+  return withLedger((ledger) => ledger.obligations.find((item) => item.id === id) ?? null);
 }
 
 export function localBootstrap(address: string) {
   return withLedger((ledger) => {
-    const balance = bucket(ledger, address);
-    if (BigInt(balance.sui) < 200_000_000n) credit(balance, "sui", 1_000_000_000n);
-    if (BigInt(balance.usdc) < 10_000_000n) credit(balance, "usdc", 20_000_000n);
-    const receipt = note(ledger, `Funded preview wallet ${address.slice(0, 8)}`);
-    return { ...balance, digest: receipt.digest };
+    const current = balance(ledger, address);
+    const sui = BigInt(current.sui) < 200_000_000n ? 200_000_000n : 0n;
+    const usdc = BigInt(current.usdc) < 60_000_000n ? 60_000_000n : 0n;
+    credit(ledger, address, usdc, sui);
+    return balance(ledger, address);
+  });
+}
+
+export function localVerify(address: string) {
+  return withLedger((ledger) => {
+    const key = address.toLowerCase();
+    if (!ledger.verified.includes(key)) ledger.verified.push(key);
+    return { digest: receipt().digest };
   });
 }
 
 export function localCreate(input: {
   sender: string;
-  payeeName: string;
-  purpose: string;
-  amount: string;
+  service: string;
+  maxQuote: string;
+  requireVerified: boolean;
+  requireProof: boolean;
   expiresAtMs: number;
-  claimHashHex: string;
 }) {
   return withLedger((ledger) => {
-    const amount = BigInt(input.amount);
-    if (amount <= 0n || amount > 100_000_000n) throw new Error("Amount must be between $0.01 and $100.");
-    if (input.expiresAtMs <= Date.now()) throw new Error("Pick a date that is still ahead.");
-    debit(bucket(ledger, input.sender), "usdc", amount, "test USDC");
-    debit(bucket(ledger, input.sender), "sui", 2_000_000n, "SUI for gas");
-    const intent: StoredIntent = {
+    const quote = BigInt(input.maxQuote);
+    const escrow = quoteToMicro(quote);
+    if (escrow <= 0n) throw new Error("Amount must be a whole number of yen, up to ¥1,000,000.");
+    if (input.expiresAtMs <= Date.now()) throw new Error("Pick a later date.");
+    debitUsdc(ledger, input.sender, escrow);
+    const obligation: ObligationRecord = {
       id: id(),
       payer: input.sender,
-      payeeName: input.payeeName.trim(),
-      purpose: input.purpose.trim(),
-      amount: amount.toString(),
+      service: input.service.trim(),
+      currency: "JPY",
+      maxQuote: quote.toString(),
+      acceptedQuote: "0",
+      rateNum: RATE_NUM.toString(),
+      rateDen: RATE_DEN.toString(),
+      requireVerified: input.requireVerified,
+      requireProof: input.requireProof,
+      merchant: "0x0",
+      merchantName: "",
+      destination: "0x0",
+      proof: "",
       expiresAtMs: input.expiresAtMs,
-      status: STATUS_PENDING,
-      payee: "0x0",
-      claimHash: input.claimHashHex,
+      status: OFFERED,
+      outcome: "",
+      escrow: escrow.toString(),
     };
-    ledger.intents.unshift(intent);
-    const receipt = note(ledger, `Locked ${intent.payeeName}'s payment`);
-    return { ...receipt, intentId: intent.id };
+    ledger.obligations.unshift(obligation);
+    return receipt(obligation.id);
   });
 }
 
-export function localAccept(input: { intentId: string; secretHex: string; payee: string }) {
+export function localAccept(input: { sender: string; obligationId: string; quote: string; merchantName: string }) {
   return withLedger((ledger) => {
-    const intent = ledger.intents.find((item) => item.id === input.intentId);
-    if (!intent) throw new Error("No intent with that id.");
-    if (intent.status === STATUS_ACCEPTED && intent.payee === input.payee) {
-      return { digest: "preview-already", intentId: intent.id };
+    const obligation = find(ledger, input.obligationId);
+    if (obligation.status !== OFFERED) throw new Error("This obligation is no longer open.");
+    if (Date.now() > obligation.expiresAtMs) throw new Error("This obligation has passed its date.");
+    const quote = BigInt(input.quote);
+    if (quote <= 0n || quote > BigInt(obligation.maxQuote)) throw new Error("That price is above the cap.");
+    if (input.sender.toLowerCase() === obligation.payer.toLowerCase()) throw new Error("The payer cannot accept their own obligation.");
+    if (obligation.requireVerified && !ledger.verified.includes(input.sender.toLowerCase())) {
+      throw new Error("That merchant is not on the verification registry.");
     }
-    if (intent.status !== STATUS_PENDING) throw new Error("This intent is no longer open.");
-    if (intent.expiresAtMs < Date.now()) throw new Error("This intent has passed its date.");
-    const digest = bytesToHex(hashSecret(hexToBytes(input.secretHex)));
-    if (digest !== intent.claimHash) throw new Error("That code does not match this intent.");
-    intent.status = STATUS_ACCEPTED;
-    intent.payee = input.payee;
-    credit(bucket(ledger, input.payee), "usdc", BigInt(intent.amount));
-    credit(bucket(ledger, input.payee), "sui", 100_000_000n);
-    const receipt = note(ledger, `Accepted payment into ${input.payee.slice(0, 8)}`);
-    return { ...receipt, intentId: intent.id };
+    obligation.acceptedQuote = quote.toString();
+    obligation.merchant = input.sender;
+    obligation.destination = input.sender;
+    obligation.merchantName = input.merchantName;
+    obligation.status = ACCEPTED;
+    return receipt(obligation.id);
   });
 }
 
-export function localCancel(sender: string, intentId: string) {
-  return withLedger((ledger) => close(ledger, sender, intentId, STATUS_CANCELLED, false));
+export function localContact(input: { obligationId: string; merchantId: string }) {
+  const desk = deskById(input.merchantId, true);
+  if (!desk) throw new Error("That desk is not in the directory.");
+  return localAccept({
+    sender: desk.address,
+    obligationId: input.obligationId,
+    quote: desk.ask,
+    merchantName: desk.name,
+  });
 }
 
-export function localReclaim(sender: string, intentId: string) {
-  return withLedger((ledger) => close(ledger, sender, intentId, STATUS_EXPIRED, true));
-}
-
-function close(ledger: Ledger, sender: string, intentId: string, status: number, expired: boolean): TxReceipt {
-  const intent = ledger.intents.find((item) => item.id === intentId);
-  if (!intent) throw new Error("No intent with that id.");
-  if (intent.payer !== sender) throw new Error("Only the payer can close this intent.");
-  if (intent.status !== STATUS_PENDING) throw new Error("This intent is no longer open.");
-  if (expired && intent.expiresAtMs >= Date.now()) throw new Error("This intent has not expired yet.");
-  intent.status = status;
-  credit(bucket(ledger, sender), "usdc", BigInt(intent.amount));
-  const receipt = note(ledger, status === STATUS_CANCELLED ? "Cancelled an intent" : "Reclaimed an expired intent");
-  return { ...receipt, intentId };
-}
-
-export function localBuy(sender: string, listingId: string, price: string) {
+export function localProof(input: { sender: string; obligationId: string; proof: string }) {
   return withLedger((ledger) => {
-    const listing = ledger.listings.find((item) => item.id === listingId);
-    if (!listing || !listing.active) throw new Error("That item has already been bought.");
-    if (listing.seller === sender) throw new Error("You can't buy your own listing.");
-    if (listing.price !== price) throw new Error("The price changed. Refresh and try again.");
-    debit(bucket(ledger, sender), "usdc", BigInt(price), "test USDC");
-    debit(bucket(ledger, sender), "sui", 2_000_000n, "SUI for gas");
-    credit(bucket(ledger, listing.seller), "usdc", BigInt(price));
-    listing.active = false;
-    const receipt = note(ledger, `Bought ${listing.title}`);
-    return { ...receipt, voucher: receipt.digest.slice(-8).toUpperCase() };
+    const obligation = find(ledger, input.obligationId);
+    if (obligation.status !== ACCEPTED) throw new Error("This obligation is not accepted.");
+    if (input.sender.toLowerCase() !== obligation.merchant.toLowerCase()) throw new Error("Only the bound merchant can submit proof.");
+    if (!input.proof.trim()) throw new Error("Proof of delivery is still missing.");
+    obligation.proof = input.proof.trim();
+    return receipt(obligation.id);
   });
 }
 
-export function localList(sender: string, title: string, detail: string, price: string) {
+export function localProve(input: { obligationId: string; merchantId: string; proof: string }) {
+  const desk = deskById(input.merchantId, true);
+  if (!desk) throw new Error("That desk is not in the directory.");
+  return localProof({ sender: desk.address, obligationId: input.obligationId, proof: input.proof });
+}
+
+export function localRelease(input: { obligationId: string }) {
   return withLedger((ledger) => {
-    debit(bucket(ledger, sender), "sui", 2_000_000n, "SUI for gas");
-    const listing: ListingRecord = {
-      id: id(),
-      seller: sender,
-      title: title.trim(),
-      detail: detail.trim(),
-      price,
-      kind: 1,
-      active: true,
-    };
-    ledger.listings.unshift(listing);
-    const receipt = note(ledger, `Listed ${listing.title}`);
-    return { ...receipt, listingId: listing.id };
+    const obligation = find(ledger, input.obligationId);
+    if (obligation.status !== ACCEPTED) throw new Error("This obligation is not ready to release.");
+    if (Date.now() > obligation.expiresAtMs) throw new Error("This obligation has passed its date.");
+    if (obligation.destination.toLowerCase() !== obligation.merchant.toLowerCase()) {
+      throw new Error("The destination does not match the merchant who accepted.");
+    }
+    const quote = BigInt(obligation.acceptedQuote);
+    if (quote <= 0n || quote > BigInt(obligation.maxQuote)) throw new Error("The stored price is not within the cap.");
+    if (obligation.requireVerified && !ledger.verified.includes(obligation.merchant.toLowerCase())) {
+      throw new Error("That merchant is not on the verification registry.");
+    }
+    if (obligation.requireProof && !obligation.proof) throw new Error("Proof of delivery is still missing.");
+    const pay = quoteToMicro(quote, BigInt(obligation.rateNum), BigInt(obligation.rateDen));
+    const escrow = BigInt(obligation.escrow);
+    if (pay <= 0n || pay > escrow) throw new Error("The escrow does not cover the frozen price.");
+    credit(ledger, obligation.destination, pay);
+    if (escrow > pay) credit(ledger, obligation.payer, escrow - pay);
+    obligation.escrow = "0";
+    obligation.status = RELEASED;
+    obligation.outcome = "released";
+    return receipt(obligation.id);
   });
 }
 
-export function localBadge(sender: string) {
+export function localCancel(input: { sender: string; obligationId: string }) {
+  return withLedger((ledger) => refund(ledger, input.obligationId, input.sender, "cancelled", false));
+}
+
+export function localDecline(input: { sender: string; obligationId: string }) {
   return withLedger((ledger) => {
-    if (ledger.badges.includes(sender)) throw new Error("This wallet already has a learner badge.");
-    debit(bucket(ledger, sender), "sui", 2_000_000n, "SUI for gas");
-    ledger.badges.push(sender);
-    const badgeId = id();
-    const receipt = note(ledger, "Minted a learner badge");
-    return { ...receipt, badgeId };
+    const obligation = find(ledger, input.obligationId);
+    if (obligation.status !== ACCEPTED) throw new Error("This obligation is not accepted.");
+    if (input.sender.toLowerCase() !== obligation.merchant.toLowerCase()) throw new Error("Only the bound merchant can decline.");
+    if (obligation.proof) throw new Error("Proof is already on the obligation.");
+    return refund(ledger, input.obligationId, obligation.payer, "declined", true);
   });
+}
+
+export function localReclaim(input: { obligationId: string }) {
+  return withLedger((ledger) => {
+    const obligation = find(ledger, input.obligationId);
+    if (Date.now() <= obligation.expiresAtMs) throw new Error("This obligation has not expired yet.");
+    return refund(ledger, input.obligationId, obligation.payer, "expired", true);
+  });
+}
+
+function refund(ledger: Ledger, obligationId: string, payer: string, outcome: string, alreadyChecked: boolean) {
+  const obligation = find(ledger, obligationId);
+  if (!alreadyChecked) {
+    if (obligation.payer.toLowerCase() !== payer.toLowerCase()) throw new Error("Only the payer can cancel this obligation.");
+    if (obligation.status !== OFFERED) throw new Error("This obligation is no longer open.");
+  } else if (obligation.status !== OFFERED && obligation.status !== ACCEPTED) {
+    throw new Error("This obligation is already closed.");
+  }
+  credit(ledger, obligation.payer, BigInt(obligation.escrow));
+  obligation.escrow = "0";
+  obligation.status = RETURNED;
+  obligation.outcome = outcome;
+  return receipt(obligation.id);
+}
+
+export function localRevise(): never {
+  throw new Error("The price was frozen at acceptance. There is no instruction that changes it.");
+}
+
+export function localRedirect(): never {
+  throw new Error("The destination was bound at acceptance. There is no instruction that retargets it.");
 }

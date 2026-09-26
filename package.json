@@ -1,5 +1,5 @@
 {
-  "name": "intenses",
+  "name": "pagointent",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start -p 43123",
     "lint": "eslint",
-    "move:test": "sui move test --path move/intenses",
-    "move:build": "sui move build --path move/intenses",
+    "move:test": "sui move test --path move/pago",
+    "move:build": "sui move build --path move/pago",
     "chain:setup": "tsx scripts/setup-chain.ts"
   },
   "dependencies": {
