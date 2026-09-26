@@ -10,6 +10,136 @@ A user can say: buy this service for up to ¥3,000, only from a verified merchan
 
 If the merchant changes the price, the payment is aimed at another address, delivery never arrives, or nobody accepts before the deadline, the funds are not released. They return to the payer.
 
+## How it works (organogram)
+
+PagoIntent separates **who sets the policy** (the user, in plain language), **who may act** (the agent signer), **who fulfills** (the merchant), and **what actually moves money** (the obligation object on Sui). The web app coordinates keys and transactions; the chain enforces the rules.
+
+### Roles and authority
+
+```mermaid
+flowchart TB
+  subgraph human["Human layer"]
+    U["User / principal"]
+    U -->|"writes terms in Compose"| POL["Policy sentence<br/>(service, ¥ cap, verified?, proof?, deadline)"]
+  end
+
+  subgraph agent["Agent layer (this browser)"]
+    POL --> ASK["Agent signer key<br/>pagointent.payer"]
+    ASK -->|"signs only when UI gates pass"| ACT["Allowed actions:<br/>lock · cancel · reclaim · release"]
+  end
+
+  subgraph app["PagoIntent app"]
+    UI["Next.js UI<br/>Compose · Obligation · Desk · Ledger"]
+    SRV["Server actions<br/>src/lib/actions.ts"]
+    SP["Gas sponsor<br/>SPONSOR_SECRET_KEY"]
+    UI --> SRV
+    SRV -->|"payer txs"| CHAIN
+    SRV -->|"merchant accept / proof<br/>sponsored gas"| SP
+    SP --> CHAIN
+  end
+
+  subgraph merchant["Merchant layer"]
+    M["Merchant"]
+    MK["Merchant key (encrypted vault)<br/>pagointent.vault"]
+    M --> MK
+    MK -->|"accept · proof · verify desk"| SRV
+    REG["On-chain registry<br/>merchant::Registry"]
+    MK -.->|"verify"| REG
+  end
+
+  subgraph chain["Sui (source of truth)"]
+    CHAIN["Shared objects"]
+    OBL["obligation::Obligation<br/>escrow + frozen rate + status"]
+    REG --> OBL
+    ASK --> OBL
+    MK --> OBL
+    CHAIN --- OBL
+  end
+
+  U --> UI
+  ACT --> UI
+```
+
+| Layer | Holds secrets? | Decides terms? | Moves escrow? |
+| --- | --- | --- | --- |
+| User | No | Yes (policy) | No |
+| Agent signer | Yes (device) | No | Signs release **only** if object conditions hold |
+| Merchant key | Yes (password) | No (accepts or posts proof) | Accept binds destination; proof unlocks release path |
+| Move obligation | N/A | **Yes (on-chain)** | `release` pays bound address; failures return funds |
+
+### System stack
+
+```mermaid
+flowchart LR
+  subgraph client["Browser"]
+    P["Payer key<br/>localStorage"]
+    V["Merchant vault<br/>AES-GCM + password"]
+    I18n["Locale<br/>pagointent.locale"]
+  end
+
+  subgraph next["Next.js"]
+    R["App Router pages"]
+    A["Server actions"]
+    C["Sui gRPC client<br/>@mysten/sui"]
+  end
+
+  subgraph sui["Sui devnet / testnet"]
+    PKG["move/pago package"]
+    USDC["usdc::MintHub<br/>test USDC"]
+    MER["merchant::Registry"]
+    OBL2["obligation module"]
+    PKG --> USDC
+    PKG --> MER
+    PKG --> OBL2
+  end
+
+  P --> R
+  V --> R
+  I18n --> R
+  R --> A
+  A --> C
+  C --> sui
+```
+
+Discovery is **event-driven**: the Merchants screen lists addresses from `MerchantVerified` events, not a hardcoded catalog. Obligations are **indexed shared objects** read via gRPC (`listObligations`, `getObligation`).
+
+### Obligation lifecycle
+
+```mermaid
+stateDiagram-v2
+  direction LR
+
+  [*] --> Offered: create (payer locks ¥ cap as test USDC)
+  Offered --> Accepted: accept (merchant freezes quote, binds destination)
+  Offered --> Returned: cancel / decline / expiry
+  Accepted --> Accepted: submit_proof (optional gate)
+  Accepted --> Released: release (all gates true)
+  Accepted --> Returned: reclaim after deadline
+  Released --> [*]
+  Returned --> [*]
+
+  note right of Offered
+    Gates while open:
+    cap · verified merchant?
+    price ≤ cap · destination
+    proof? · deadline
+  end note
+
+  note right of Released
+    revise_price and redirect
+    abort on-chain (demo refusals)
+  end note
+```
+
+Typical happy path:
+
+1. **Compose** — user describes the purchase; agent signer **locks** escrow at the yen cap (rate ¥150 = $1 frozen on the object).
+2. **Accept** — verified merchant (if required) **accepts** at a quote ≤ cap; destination = merchant address.
+3. **Proof** — if required, merchant **submits** a delivery reference on the object.
+4. **Release** — agent asks **release**; Move pays the bound address and refunds unused cap.
+
+If any required gate fails, or the deadline passes, funds **return** to the payer instead of paying out.
+
 ## What is on chain
 
 The Move package in `move/pago` does three things:
