@@ -1,8 +1,8 @@
-# PagoIntent
-
 <p>
   <img src="public/pagointent-mark.jpg" width="96" height="96" alt="PagoIntent" />
 </p>
+
+# PagoIntent
 
 A programmable obligation layer for agentic commerce on Sui. PagoIntent decides what must be true before an autonomous agent is allowed to pay.
 
