@@ -23,8 +23,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
     getStatus().then(setStatus).catch(() => setStatus(null));
   }, []);
 
-  const live = status && status.mode !== "local";
-
   return (
     <div className="relative z-10 flex min-h-full flex-col">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070b12]/75 backdrop-blur-xl">
@@ -50,22 +48,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <div className="ml-auto flex shrink-0 items-center gap-2 text-xs sm:gap-3">
+          <div className="ml-auto flex shrink-0 items-center text-xs">
             <Link href="/wallet" className="font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-[#7af7e2]">
               Keys
             </Link>
-            <span
-              title={status ? (live ? `Sui ${status.mode}` : status.rpcError || "Sui offline") : "Checking Sui"}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 font-mono uppercase tracking-[0.12em]",
-                live ? "border-[#3dffc8]/40 text-[#7af7e2]" : "border-white/10 text-muted-foreground",
-              )}
-            >
-              <span className={cn("size-1.5 rounded-full", live ? "bg-[#3dffc8] shadow-[0_0_8px_#3dffc8]" : "bg-muted-foreground")} />
-              <span className="hidden sm:inline">
-                {status ? (live ? `Sui ${status.mode}` : "Sui offline") : "Checking Sui…"}
-              </span>
-            </span>
           </div>
         </div>
       </header>
