@@ -153,59 +153,71 @@ export function ObligationScreen() {
 
         {obligation.status === OFFERED && !expired ? (
           <section className="panel p-5">
-            <h2 className="text-sm font-medium">Contact a desk</h2>
+            <h2 className="text-sm font-medium">Merchants on the registry</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              The agent asks a merchant to accept at their own price. The price has to sit at or under the cap. An unverified desk is refused when verification is required.
+              The agent reads who is verified on Sui and asks one of them to accept at the cap, {formatYen(obligation.maxQuote)}. A merchant who verifies from the desk shows up here on the next read.
             </p>
             <div className="mt-4 space-y-3">
               {desks.map((desk) => (
-                <div key={desk.id} className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+                <div key={desk.id} className="flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium">
-                      {desk.name}{" "}
-                      <span className="font-normal text-muted-foreground">{desk.verified ? "verified" : "not verified"}</span>
+                      {desk.name} <span className="chip chip-hold">Verified</span>
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Asks {formatYen(desk.ask)} · {desk.city}
-                    </p>
+                    <p className="mt-1 font-mono text-xs text-muted-foreground">{shortAddress(desk.address)}</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="bg-background"
-                    disabled={busy !== null || !desk.address}
-                    onClick={() =>
-                      run(desk.id, () => contactDesk(obligation.id, desk.id), `${desk.name} answered.`)
-                    }
-                  >
-                    {busy === desk.id ? "Contacting…" : "Contact"}
-                  </Button>
+                  {desk.reachable ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy !== null}
+                      onClick={() =>
+                        run(
+                          desk.id,
+                          () => contactDesk(obligation.id, desk.address, desk.name, obligation.maxQuote),
+                          `${desk.name} accepted at the cap.`,
+                        )
+                      }
+                    >
+                      {busy === desk.id ? "Asking…" : `Ask at ${formatYen(obligation.maxQuote)}`}
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Signs from their own desk.</p>
+                  )}
                 </div>
               ))}
             </div>
-            {!desks.some((desk) => desk.address) ? (
-              <p className="mt-3 text-sm text-muted-foreground">No desk keys are published on this network yet. A merchant can still accept from the desk page.</p>
+            {desks.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Nobody is verified yet. A merchant opens the desk, creates a key, and asks the registry. Then the agent can find them.
+              </p>
             ) : null}
           </section>
         ) : null}
 
-        {obligation.status === ACCEPTED && !obligation.proof && boundDesk ? (
+        {obligation.status === ACCEPTED && !obligation.proof ? (
           <section className="panel p-5">
             <h2 className="text-sm font-medium">Proof of delivery</h2>
             <p className="mt-1 text-sm text-muted-foreground">The bound merchant posts the reference. Release stays closed until it is on the object.</p>
-            <div className="mt-3 space-y-2">
-              <Label htmlFor="proof">Reference</Label>
-              <Input id="proof" className="h-11 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} />
-              <Button
-                type="button"
-                disabled={busy !== null}
-                onClick={() =>
-                  run("proof", () => submitDeskProof(obligation.id, boundDesk.id, proof), "Proof is on the obligation.")
-                }
-              >
-                {busy === "proof" ? "Posting…" : `Post proof as ${boundDesk.name}`}
-              </Button>
-            </div>
+            {boundDesk?.reachable ? (
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="proof">Reference</Label>
+                <Input id="proof" className="h-11 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} />
+                <Button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run("proof", () => submitDeskProof(obligation.id, boundDesk.address, proof), "Proof is on the obligation.")
+                  }
+                >
+                  {busy === "proof" ? "Posting…" : `Post proof as ${boundDesk.name}`}
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {obligation.merchantName || "The merchant"} posts that reference from their desk.
+              </p>
+            )}
           </section>
         ) : null}
 

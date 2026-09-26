@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { deskById, directory } from "@/lib/desks";
 import { quoteToMicro } from "@/lib/sui/format";
+import type { Desk } from "@/lib/sui/types";
 import {
   ACCEPTED,
   OFFERED,
@@ -15,10 +15,12 @@ import {
   type TxReceipt,
 } from "@/lib/sui/types";
 
+type VerifiedMerchant = { address: string; name: string };
+
 type Ledger = {
   balances: Record<string, BalanceSnapshot>;
   obligations: ObligationRecord[];
-  verified: string[];
+  verified: VerifiedMerchant[];
 };
 
 const preferredPath = process.env.LEDGER_DIR
@@ -33,12 +35,21 @@ function id() {
 }
 
 function emptyLedger(): Ledger {
-  const desks = directory(true);
-  return {
-    balances: {},
-    obligations: [],
-    verified: desks.filter((desk) => desk.verified).map((desk) => desk.address.toLowerCase()),
-  };
+  return { balances: {}, obligations: [], verified: [] };
+}
+
+function asVerified(raw: unknown): VerifiedMerchant[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const merchants: VerifiedMerchant[] = [];
+  for (const item of raw) {
+    const address = (typeof item === "string" ? item : item && typeof item === "object" && "address" in item ? String(item.address) : "").toLowerCase();
+    const name = typeof item === "object" && item && "name" in item && item.name ? String(item.name) : "Verified merchant";
+    if (!address || seen.has(address)) continue;
+    seen.add(address);
+    merchants.push({ address, name });
+  }
+  return merchants;
 }
 
 async function readLedger(): Promise<Ledger> {
@@ -46,7 +57,7 @@ async function readLedger(): Promise<Ledger> {
     try {
       const ledger = JSON.parse(await readFile(candidate, "utf8")) as Ledger;
       activePath = candidate;
-      if (!ledger.verified) ledger.verified = emptyLedger().verified;
+      ledger.verified = asVerified(ledger.verified);
       return ledger;
     } catch {
       // A missing file starts a fresh preview ledger.
@@ -138,12 +149,28 @@ export function localBootstrap(address: string) {
   });
 }
 
-export function localVerify(address: string) {
+export function localVerify(address: string, name = "Verified merchant") {
   return withLedger((ledger) => {
     const key = address.toLowerCase();
-    if (!ledger.verified.includes(key)) ledger.verified.push(key);
+    const existing = ledger.verified.find((merchant) => merchant.address === key);
+    if (existing) existing.name = name;
+    else ledger.verified.push({ address: key, name });
     return { digest: receipt().digest };
   });
+}
+
+export function localDesks() {
+  return withLedger((ledger) =>
+    ledger.verified.map(
+      (merchant): Desk => ({
+        id: merchant.address,
+        name: merchant.name,
+        address: merchant.address,
+        verified: true,
+        reachable: true,
+      }),
+    ),
+  );
 }
 
 export function localCreate(input: {
@@ -193,7 +220,7 @@ export function localAccept(input: { sender: string; obligationId: string; quote
     const quote = BigInt(input.quote);
     if (quote <= 0n || quote > BigInt(obligation.maxQuote)) throw new Error("That price is above the cap.");
     if (input.sender.toLowerCase() === obligation.payer.toLowerCase()) throw new Error("The payer cannot accept their own obligation.");
-    if (obligation.requireVerified && !ledger.verified.includes(input.sender.toLowerCase())) {
+    if (obligation.requireVerified && !ledger.verified.some((merchant) => merchant.address === input.sender.toLowerCase())) {
       throw new Error("That merchant is not on the verification registry.");
     }
     obligation.acceptedQuote = quote.toString();
@@ -205,14 +232,12 @@ export function localAccept(input: { sender: string; obligationId: string; quote
   });
 }
 
-export function localContact(input: { obligationId: string; merchantId: string }) {
-  const desk = deskById(input.merchantId, true);
-  if (!desk) throw new Error("That desk is not in the directory.");
+export function localContact(input: { obligationId: string; merchant: string; merchantName: string; quote: string }) {
   return localAccept({
-    sender: desk.address,
+    sender: input.merchant,
     obligationId: input.obligationId,
-    quote: desk.ask,
-    merchantName: desk.name,
+    quote: input.quote,
+    merchantName: input.merchantName,
   });
 }
 
@@ -227,10 +252,8 @@ export function localProof(input: { sender: string; obligationId: string; proof:
   });
 }
 
-export function localProve(input: { obligationId: string; merchantId: string; proof: string }) {
-  const desk = deskById(input.merchantId, true);
-  if (!desk) throw new Error("That desk is not in the directory.");
-  return localProof({ sender: desk.address, obligationId: input.obligationId, proof: input.proof });
+export function localProve(input: { obligationId: string; merchant: string; proof: string }) {
+  return localProof({ sender: input.merchant, obligationId: input.obligationId, proof: input.proof });
 }
 
 export function localRelease(input: { obligationId: string }) {
@@ -243,7 +266,7 @@ export function localRelease(input: { obligationId: string }) {
     }
     const quote = BigInt(obligation.acceptedQuote);
     if (quote <= 0n || quote > BigInt(obligation.maxQuote)) throw new Error("The stored price is not within the cap.");
-    if (obligation.requireVerified && !ledger.verified.includes(obligation.merchant.toLowerCase())) {
+    if (obligation.requireVerified && !ledger.verified.some((merchant) => merchant.address === obligation.merchant.toLowerCase())) {
       throw new Error("That merchant is not on the verification registry.");
     }
     if (obligation.requireProof && !obligation.proof) throw new Error("Proof of delivery is still missing.");

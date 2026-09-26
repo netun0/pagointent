@@ -3,7 +3,6 @@ import path from "node:path";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
-import { deskById, directory } from "@/lib/desks";
 import { chainMode, deployment } from "@/lib/sui/config";
 import { sui } from "@/lib/sui/client";
 import { quoteToMicro } from "@/lib/sui/format";
@@ -23,7 +22,7 @@ import {
   localRedirect,
   localRelease,
   localRevise,
-  localVerified,
+  localDesks,
   localVerify,
 } from "@/lib/sui/local-ledger";
 import {
@@ -77,15 +76,23 @@ function merchantSecrets(): Record<string, string> {
   return JSON.parse(readFileSync(secretPath, "utf8")) as Record<string, string>;
 }
 
-function merchantSecret(id: string) {
+function merchantKeyFor(address: string) {
+  const wanted = address.toLowerCase();
+  let secrets: Record<string, string>;
   try {
-    const secret = merchantSecrets()[id];
-    if (!secret) throw new Error("This desk has to accept from its own device.");
-    return Ed25519Keypair.fromSecretKey(secret);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("own device")) throw error;
-    throw new Error("Merchant keys are not on this server. Run npm run chain:setup.");
+    secrets = merchantSecrets();
+  } catch {
+    return null;
   }
+  for (const secret of Object.values(secrets)) {
+    try {
+      const key = Ed25519Keypair.fromSecretKey(secret);
+      if (key.toSuiAddress().toLowerCase() === wanted) return key;
+    } catch {
+      // Skip a secret this process cannot parse.
+    }
+  }
+  return null;
 }
 
 function sleep(ms: number) {
@@ -256,28 +263,33 @@ export async function getObligation(id: string): Promise<ObligationRecord | null
   }
 }
 
+function desksFromRegistry(names: Map<string, string>): Desk[] {
+  return [...names.entries()].map(([address, name]) => ({
+    id: address,
+    name: name || "Verified merchant",
+    address,
+    verified: true,
+    reachable: Boolean(merchantKeyFor(address)),
+  }));
+}
+
 export async function listDesks(): Promise<{ desks: Desk[]; verified: string[] }> {
-  const local = chainMode() === "local";
-  const desks = directory(local);
-  if (local) {
-    return { desks, verified: await localVerified() };
+  if (chainMode() === "local") {
+    const desks = await localDesks();
+    return { desks, verified: desks.map((desk) => desk.address) };
   }
   try {
     const verifiedEvents = await events(`${deployment().packageId}::merchant::MerchantVerified`);
     const names = new Map<string, string>();
-    for (const event of verifiedEvents) {
+    for (const event of [...verifiedEvents].reverse()) {
       const address = asString(event.json?.merchant).toLowerCase();
-      if (address) names.set(address, asString(event.json?.name));
+      const name = asString(event.json?.name);
+      if (address && !isZero(address)) names.set(address, name || names.get(address) || "Verified merchant");
     }
-    return {
-      desks: desks.map((desk) => ({
-        ...desk,
-        verified: desk.address ? names.has(desk.address.toLowerCase()) : false,
-      })),
-      verified: [...names.keys()],
-    };
+    const desks = desksFromRegistry(names);
+    return { desks, verified: desks.map((desk) => desk.address) };
   } catch {
-    return { desks, verified: [] };
+    return { desks: [], verified: [] };
   }
 }
 
@@ -325,8 +337,8 @@ type BuildInput =
   | { action: "proof"; sender: string; obligationId: string; proof: string }
   | { action: "decline"; sender: string; obligationId: string }
   | { action: "verify"; sender: string; merchant: string; merchantName: string }
-  | { action: "contact"; obligationId: string; merchantId: string }
-  | { action: "prove"; obligationId: string; merchantId: string; proof: string };
+  | { action: "contact"; obligationId: string; merchant: string; merchantName: string; quote: string }
+  | { action: "prove"; obligationId: string; merchant: string; proof: string };
 
 function assertText(value: string, label: string, max: number) {
   const trimmed = value.trim();
@@ -345,7 +357,7 @@ export async function act(input: BuildInput): Promise<TxReceipt> {
   if (input.action === "accept") return localAccept(input);
   if (input.action === "proof") return localProof(input);
   if (input.action === "decline") return localDecline(input);
-  if (input.action === "verify") return localVerify(input.merchant);
+  if (input.action === "verify") return localVerify(input.merchant, input.merchantName);
   if (input.action === "contact") return localContact(input);
   return localProve(input);
 }
@@ -480,7 +492,7 @@ export async function submitTransaction(bytes: string, signature: string) {
 }
 
 export async function verifyMerchant(merchant: string, merchantName: string) {
-  if (chainMode() === "local") return localVerify(merchant);
+  if (chainMode() === "local") return localVerify(merchant, merchantName);
   const deployed = deployment();
   const tx = new Transaction();
   tx.moveCall({
@@ -493,24 +505,20 @@ export async function verifyMerchant(merchant: string, merchantName: string) {
 
 export async function agentAct(input: Extract<BuildInput, { action: "contact" | "prove" }>) {
   if (chainMode() === "local") return act(input);
-  const desk = deskById(input.merchantId, false);
-  if (!desk || isZero(desk.address)) throw new Error("That desk is not published on this network yet.");
-  const key = merchantSecret(input.merchantId);
-  if (key.toSuiAddress().toLowerCase() !== desk.address.toLowerCase()) {
-    throw new Error("The published desk address does not match the server key.");
-  }
+  const key = merchantKeyFor(input.merchant);
+  if (!key) throw new Error("The registry found this merchant. They sign the acceptance from their own desk.");
   const prepared =
     input.action === "contact"
       ? await prepareMerchant({
           action: "accept",
-          sender: desk.address,
+          sender: key.toSuiAddress(),
           obligationId: input.obligationId,
-          quote: desk.ask,
-          merchantName: desk.name,
+          quote: input.quote,
+          merchantName: input.merchantName,
         })
       : await prepareMerchant({
           action: "proof",
-          sender: desk.address,
+          sender: key.toSuiAddress(),
           obligationId: input.obligationId,
           proof: input.proof,
         });

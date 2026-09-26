@@ -14,10 +14,10 @@ import Link from "next/link";
 
 export function DeskScreen() {
   const vault = useVault();
-  const [name, setName] = useState("Harbor counter");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [quote, setQuote] = useState("2800");
+  const [quote, setQuote] = useState("");
   const [proof, setProof] = useState("POD-4421 · handed to the concierge");
   const [rows, setRows] = useState<ObligationRecord[]>([]);
   const [verified, setVerified] = useState<string[]>([]);

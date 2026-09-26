@@ -37,11 +37,9 @@ export type ObligationRecord = {
 export type Desk = {
   id: string;
   name: string;
-  city: string;
-  service: string;
-  ask: string;
-  verified: boolean;
   address: string;
+  verified: boolean;
+  reachable: boolean;
 };
 
 export type BalanceSnapshot = {

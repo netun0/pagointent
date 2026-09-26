@@ -110,12 +110,12 @@ export function redirectPayment(secret: string, obligationId: string, destinatio
   return mutate({ action: "redirect", sender, obligationId, destination }, secret);
 }
 
-export function contactDesk(obligationId: string, merchantId: string) {
-  return request<TxReceipt>("POST", "", { op: "agent", action: "contact", obligationId, merchantId });
+export function contactDesk(obligationId: string, merchant: string, merchantName: string, quote: string) {
+  return request<TxReceipt>("POST", "", { op: "agent", action: "contact", obligationId, merchant, merchantName, quote });
 }
 
-export function submitDeskProof(obligationId: string, merchantId: string, proof: string) {
-  return request<TxReceipt>("POST", "", { op: "agent", action: "prove", obligationId, merchantId, proof });
+export function submitDeskProof(obligationId: string, merchant: string, proof: string) {
+  return request<TxReceipt>("POST", "", { op: "agent", action: "prove", obligationId, merchant, proof });
 }
 
 export function merchantAccept(secret: string, obligationId: string, quote: string, merchantName: string) {

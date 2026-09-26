@@ -37,7 +37,7 @@ npm run move:build
 SUI_NETWORK=devnet npm run chain:setup
 ```
 
-`chain:setup` publishes the package, verifies Harbor Bindery and Kanda Desk, leaves Night Window unverified, and writes their public addresses to `src/lib/sui/merchants.json`. Private keys stay in `.env.local` and `data/merchant-secrets.json`. Do not commit those. Restart `npm run dev` after setup.
+`chain:setup` publishes the package and can verify the first demo desks so the registry is not empty. The app does not keep a merchant catalog: it discovers whoever `MerchantVerified` recorded. Private keys stay in `.env.local` and `data/merchant-secrets.json`. Do not commit those. Restart `npm run dev` after setup.
 
 Set `FORCE_PUBLISH=1` to publish again when a package is already recorded.
 
