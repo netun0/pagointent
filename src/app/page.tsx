@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 
 const rules = [
@@ -27,7 +28,8 @@ export default function HomePage() {
   return (
     <div className="grid items-start gap-10 lg:grid-cols-[1.15fr_0.85fr]">
       <div>
-        <p className="kicker">Programmable obligations · on-chain</p>
+        <Logo size={88} priority alt="PagoIntent" />
+        <p className="kicker mt-6">Programmable obligations · on-chain</p>
         <h1 className="mt-4 max-w-xl text-4xl font-semibold leading-[1.02] tracking-tight sm:text-6xl">
           Autonomous payments,{" "}
           <span className="glow-text">only when the terms are true.</span>

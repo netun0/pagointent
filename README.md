@@ -1,5 +1,9 @@
 # PagoIntent
 
+<p>
+  <img src="public/pagointent-mark.jpg" width="96" height="96" alt="PagoIntent" />
+</p>
+
 A programmable obligation layer for agentic commerce on Sui. PagoIntent decides what must be true before an autonomous agent is allowed to pay.
 
 A user can say: buy this service for up to ¥3,000, only from a verified merchant, and only release the money when proof of delivery arrives. PagoIntent contacts a merchant, creates a Sui key for them if they do not have one, locks test USDC in a shared escrow, and releases it only when the predicate holds.

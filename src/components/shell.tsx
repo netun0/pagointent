@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Logo } from "@/components/logo";
 import { getStatus } from "@/lib/actions";
 import type { ChainStatus } from "@/lib/sui/types";
 import { cn } from "cn";
@@ -28,12 +29,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="relative z-10 flex min-h-full flex-col">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070b12]/75 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3">
-          <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#3dffc8] opacity-60" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-[#3dffc8] shadow-[0_0_12px_#3dffc8]" />
-            </span>
-            PagoIntent
+          <Link href="/" className="flex min-w-0 items-center gap-2.5 text-sm font-semibold tracking-tight">
+            <Logo size={32} priority />
+            <span className="truncate">PagoIntent</span>
           </Link>
           <nav className="ml-2 hidden items-center gap-1 md:flex">
             {links.map((link) => {
@@ -52,18 +50,21 @@ export function Shell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <div className="ml-auto flex items-center gap-3 text-xs">
+          <div className="ml-auto flex shrink-0 items-center gap-2 text-xs sm:gap-3">
             <Link href="/wallet" className="font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-[#7af7e2]">
               Keys
             </Link>
             <span
+              title={status ? (live ? `Sui ${status.mode}` : "Preview ledger") : "Checking Sui"}
               className={cn(
                 "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 font-mono uppercase tracking-[0.12em]",
                 live ? "border-[#3dffc8]/40 text-[#7af7e2]" : "border-white/10 text-muted-foreground",
               )}
             >
               <span className={cn("size-1.5 rounded-full", live ? "bg-[#3dffc8] shadow-[0_0_8px_#3dffc8]" : "bg-muted-foreground")} />
-              {status ? (live ? `Sui ${status.mode}` : "Preview ledger") : "Checking Sui…"}
+              <span className="hidden sm:inline">
+                {status ? (live ? `Sui ${status.mode}` : "Preview ledger") : "Checking Sui…"}
+              </span>
             </span>
           </div>
         </div>
