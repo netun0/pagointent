@@ -29,7 +29,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3">
           <Link href="/" className="flex min-w-0 items-center gap-2.5 text-sm font-semibold tracking-tight">
             <Logo size={44} alt="PagoIntent" />
-            <span className="truncate">PagoIntent</span>
+            <span className="truncate text-[#3dffc8]">PagoIntent</span>
           </Link>
           <nav className="ml-2 hidden items-center gap-1 md:flex">
             {links.map((link) => {
