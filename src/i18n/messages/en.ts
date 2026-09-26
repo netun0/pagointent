@@ -8,6 +8,7 @@ export const en = {
     keys: "Keys",
   },
   shell: {
+    language: "Language",
     footer:
       "PagoIntent decides whether an agent is allowed to pay. Settlement is test USDC on Sui. The obligation is denominated in yen at a rate frozen in the object.",
     refGas: "Reference gas {{rgp}} MIST.",

@@ -159,7 +159,7 @@ npm run dev
 
 Open [http://127.0.0.1:43123](http://127.0.0.1:43123).
 
-Use the language selector in the header to switch between **English**, **日本語**, **Español**, and **Português**. The choice is stored in this browser (`pagointent.locale`).
+Use the **Language / Idioma / 言語** control in the header (mint pill with **EN · JA · ES · PT**). On phones it sits in a second row under the logo. The choice is stored in this browser (`pagointent.locale`).
 
 If `src/lib/sui/deployed.json` has a package id and a merchant registry, and `SPONSOR_SECRET_KEY` is set, the app settles on that Sui network. Otherwise it refuses to write anything. There is no local ledger.
 

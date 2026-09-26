@@ -10,6 +10,7 @@ export const es: Messages = {
     keys: "Claves",
   },
   shell: {
+    language: "Idioma",
     footer:
       "PagoIntent decide si un agente puede pagar. La liquidación es USDC de prueba en Sui. La obligación está en yenes con una tasa fijada en el objeto.",
     refGas: "Gas de referencia {{rgp}} MIST.",

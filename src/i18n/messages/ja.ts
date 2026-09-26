@@ -10,6 +10,7 @@ export const ja: Messages = {
     keys: "鍵",
   },
   shell: {
+    language: "言語",
     footer:
       "PagoIntent はエージェントが支払ってよいかを決めます。決済は Sui 上のテスト USDC です。債務はオブジェクトに固定されたレートで円建てです。",
     refGas: "参照ガス {{rgp}} MIST。",

@@ -19,6 +19,7 @@ import {
   type Locale,
   type Messages,
 } from "./index";
+import { cn } from "@/lib/utils";
 
 type I18nContextValue = {
   locale: Locale;
@@ -28,6 +29,13 @@ type I18nContextValue = {
 };
 
 const I18nContext = createContext<I18nContextValue | null>(null);
+
+const localeShort: Record<Locale, string> = {
+  en: "EN",
+  ja: "JA",
+  es: "ES",
+  pt: "PT",
+};
 
 function readStoredLocale(): Locale {
   if (typeof window === "undefined") return defaultLocale;
@@ -81,26 +89,55 @@ export function useI18n() {
   return ctx;
 }
 
-export function LanguageSelect() {
-  const { locale, setLocale } = useI18n();
+type LanguageSelectProps = {
+  /** Tighter layout for the mobile footer bar */
+  compact?: boolean;
+  className?: string;
+};
+
+export function LanguageSelect({ compact = false, className }: LanguageSelectProps) {
+  const { locale, setLocale, messages } = useI18n();
+  const label = messages.shell.language;
 
   return (
-    <label className="flex items-center gap-1.5">
-      <span className="sr-only">Language</span>
-      <select
-        value={locale}
-        onChange={(event) => {
-          const next = event.target.value;
-          if (isLocale(next)) setLocale(next);
-        }}
-        className="h-8 max-w-[7.5rem] cursor-pointer rounded-full border border-white/15 bg-white/5 px-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground outline-none hover:text-[#7af7e2] focus:border-[#3dffc8]/40"
-      >
-        {locales.map((entry) => (
-          <option key={entry.code} value={entry.code} className="bg-[#070b12] text-foreground">
-            {entry.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        compact ? "flex-col gap-1.5" : "rounded-full border border-[#3dffc8]/35 bg-[#3dffc8]/8 px-2 py-1 shadow-[inset_0_0_0_1px_rgba(61,255,200,0.12)]",
+        className,
+      )}
+      role="group"
+      aria-label={label}
+    >
+      {!compact ? (
+        <span className="hidden pl-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#7af7e2] sm:inline">
+          {label}
+        </span>
+      ) : (
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7af7e2]">{label}</span>
+      )}
+      <div className={cn("flex gap-0.5", compact && "flex-wrap justify-center")}>
+        {locales.map((entry) => {
+          const active = entry.code === locale;
+          return (
+            <button
+              key={entry.code}
+              type="button"
+              title={entry.label}
+              aria-pressed={active}
+              onClick={() => setLocale(entry.code)}
+              className={cn(
+                "min-w-[2.25rem] rounded-full px-2 py-1 font-mono text-[10px] font-medium uppercase tracking-wide transition",
+                active
+                  ? "bg-[#3dffc8]/20 text-[#3dffc8] shadow-[inset_0_0_0_1px_rgba(61,255,200,0.55)]"
+                  : "text-muted-foreground hover:bg-white/10 hover:text-[#7af7e2]",
+              )}
+            >
+              {localeShort[entry.code]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

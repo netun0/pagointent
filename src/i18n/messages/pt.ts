@@ -10,6 +10,7 @@ export const pt: Messages = {
     keys: "Chaves",
   },
   shell: {
+    language: "Idioma",
     footer:
       "O PagoIntent decide se um agente pode pagar. A liquidação é USDC de teste na Sui. A obrigação é em ienes com taxa fixada no objeto.",
     refGas: "Gás de referência {{rgp}} MIST.",
