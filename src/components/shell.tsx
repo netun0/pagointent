@@ -25,56 +25,72 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const live = status && status.mode !== "local";
 
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-4 px-4 py-3">
-          <Link href="/" className="text-sm font-medium tracking-tight">
+    <div className="relative z-10 flex min-h-full flex-col">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070b12]/75 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#3dffc8] opacity-60" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-[#3dffc8] shadow-[0_0_12px_#3dffc8]" />
+            </span>
             PagoIntent
           </Link>
           <nav className="ml-2 hidden items-center gap-1 md:flex">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground",
-                  (pathname === link.href || pathname.startsWith(`${link.href}/`)) && "bg-card text-foreground",
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {links.map((link) => {
+              const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground",
+                    active && "bg-[#3dffc8]/10 text-[#7af7e2] shadow-[inset_0_0_0_1px_rgba(61,255,200,0.35)]",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-xs">
-            <Link href="/wallet" className="text-muted-foreground hover:text-foreground">
+            <Link href="/wallet" className="font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-[#7af7e2]">
               Keys
             </Link>
-            <span className={cn("rounded-md border px-2 py-1", live ? "border-emerald-800/30 text-emerald-900" : "text-muted-foreground")}>
+            <span
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 font-mono uppercase tracking-[0.12em]",
+                live ? "border-[#3dffc8]/40 text-[#7af7e2]" : "border-white/10 text-muted-foreground",
+              )}
+            >
+              <span className={cn("size-1.5 rounded-full", live ? "bg-[#3dffc8] shadow-[0_0_8px_#3dffc8]" : "bg-muted-foreground")} />
               {status ? (live ? `Sui ${status.mode}` : "Preview ledger") : "Checking Sui…"}
             </span>
           </div>
         </div>
       </header>
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8">{children}</div>
-      <footer className="mx-auto w-full max-w-5xl px-4 pb-24 text-sm text-muted-foreground md:pb-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">{children}</div>
+      <footer className="mx-auto w-full max-w-6xl px-4 pb-24 font-mono text-[11px] leading-relaxed tracking-wide text-muted-foreground md:pb-8">
         Orbital moves money. Yodl pays a merchant who already has a local rail. PagoIntent decides whether an agent is allowed to pay.
-        Settlement is test USDC on Sui, not Circle’s dollar. The obligation is denominated in yen at a rate frozen in the object.
-        {status?.referenceGasPrice ? ` Reference gas is ${status.referenceGasPrice} MIST.` : ""}
+        Settlement is test USDC on Sui. The obligation is denominated in yen at a rate frozen in the object.
+        {status?.referenceGasPrice ? ` Reference gas ${status.referenceGasPrice} MIST.` : ""}
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#070b12]/90 backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-4">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "px-1 py-3 text-center text-xs text-muted-foreground",
-                (pathname === link.href || pathname.startsWith(`${link.href}/`)) && "text-foreground",
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "px-1 py-3 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground",
+                  active && "text-[#7af7e2]",
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
       </nav>
     </div>

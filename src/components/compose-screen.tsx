@@ -99,24 +99,24 @@ export function ComposeScreen() {
   return (
     <div className="grid items-start gap-10 lg:grid-cols-[1fr_0.8fr]">
       <div>
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-emerald-900">Compose</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Write what must be true.</h1>
+        <p className="kicker">Compose</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Write what must be true.</h1>
         <p className="mt-2 max-w-xl text-muted-foreground">
           The sentence is the policy. Locking it escrows the yen cap in test USDC at ¥150 = $1. The rate is stored on the obligation and does not move.
         </p>
         {!address ? (
-          <div className="mt-6 rounded-md border bg-card p-5">
+          <div className="panel mt-6 p-5">
             <p className="font-medium">The agent needs a signer on this device.</p>
             <p className="mt-1 text-sm text-muted-foreground">
               PagoIntent creates a Sui key in this browser and funds it with test USDC. That key locks the escrow and is the one allowed to ask for release. It is not a wallet for the merchant.
             </p>
-            <Button className="mt-4 h-11 rounded-md px-5" onClick={createSigner} disabled={busy !== null}>
+            <Button className="mt-4 h-11 px-5" onClick={createSigner} disabled={busy !== null}>
               {busy === "wallet" ? "Funding…" : "Create the agent signer"}
             </Button>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-4 py-3 text-sm">
+            <div className="panel flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
               <div>
                 <p className="text-muted-foreground">Signer</p>
                 <p className="font-mono">{shortAddress(address)}</p>
@@ -132,16 +132,16 @@ export function ComposeScreen() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="service">Service</Label>
-              <Input id="service" className="h-11 bg-card px-3" value={service} onChange={(event) => setService(event.target.value)} required />
+              <Input id="service" className="h-11 px-3 font-mono" value={service} onChange={(event) => setService(event.target.value)} required />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="amount">Up to (JPY)</Label>
-                <Input id="amount" className="h-11 bg-card px-3" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} required />
+                <Input id="amount" className="h-11 px-3 font-mono" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="date">Accept and deliver by</Label>
-                <Input id="date" type="date" className="h-11 bg-card px-3" value={date} min={todayInputValue()} onChange={(event) => setDate(event.target.value)} required />
+                <Input id="date" type="date" className="h-11 px-3 font-mono" value={date} min={todayInputValue()} onChange={(event) => setDate(event.target.value)} required />
               </div>
             </div>
             <div className="flex flex-col gap-2 text-sm">
@@ -157,15 +157,15 @@ export function ComposeScreen() {
             <p className="text-sm text-muted-foreground">
               {quote ? `${formatYen(quote)} locks ${formatUsd(quoteToMicro(quote))}.` : "Enter a whole number of yen."}
             </p>
-            <Button className="h-11 rounded-md px-5" disabled={busy !== null}>
+            <Button className="h-11 px-5" disabled={busy !== null}>
               {busy === "lock" ? "Locking the escrow…" : "Lock the escrow"}
             </Button>
           </form>
         )}
-        {error ? <p className="mt-4 text-sm text-[#8d2e2e]">{error}</p> : null}
+        {error ? <p className="mt-4 text-sm text-stop">{error}</p> : null}
       </div>
-      <aside className="rounded-md border bg-card p-5">
-        <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">The agent will be told</p>
+      <aside className="panel p-5">
+        <p className="kicker">The agent will be told</p>
         <p className="mt-3 text-lg leading-snug">{sentence}</p>
       </aside>
     </div>

@@ -1,6 +1,5 @@
 import { gates, type GateState } from "@/lib/sui/format";
 import type { ObligationRecord } from "@/lib/sui/types";
-import { cn } from "cn";
 
 const mark: Record<GateState, string> = {
   pass: "Hold",
@@ -8,27 +7,24 @@ const mark: Record<GateState, string> = {
   fail: "Stop",
 };
 
+const chip: Record<GateState, string> = {
+  pass: "chip chip-hold",
+  wait: "chip chip-wait",
+  fail: "chip chip-stop",
+};
+
 export function Conditions({ obligation, now }: { obligation: ObligationRecord; now: number }) {
   const rows = gates(obligation, now);
   return (
-    <ol className="divide-y rounded-md border bg-card">
+    <ol className="panel divide-y divide-white/8">
       {rows.map((row, index) => (
-        <li key={row.id} className="grid grid-cols-[auto_1fr_auto] items-start gap-3 px-4 py-3">
-          <span className="font-mono text-xs text-muted-foreground">{index + 1}</span>
+        <li key={row.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3">
+          <span className="font-mono text-xs text-[#7af7e2]/70">{String(index + 1).padStart(2, "0")}</span>
           <div>
             <p className="text-sm font-medium">{row.label}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">{row.detail}</p>
           </div>
-          <span
-            className={cn(
-              "font-mono text-[11px] uppercase tracking-wide",
-              row.state === "pass" && "text-emerald-800",
-              row.state === "wait" && "text-[#8a5a12]",
-              row.state === "fail" && "text-[#8d2e2e]",
-            )}
-          >
-            {mark[row.state]}
-          </span>
+          <span className={chip[row.state]}>{mark[row.state]}</span>
         </li>
       ))}
     </ol>

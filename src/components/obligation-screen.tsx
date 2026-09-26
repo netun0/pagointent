@@ -76,7 +76,7 @@ export function ObligationScreen() {
   if (!obligation) {
     return (
       <div>
-        <h1 className="text-3xl font-medium tracking-tight">This obligation is not on the ledger.</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">This obligation is not on the ledger.</h1>
         <p className="mt-2 text-muted-foreground">{error || "Check the link and try again."}</p>
       </div>
     );
@@ -122,8 +122,8 @@ export function ObligationScreen() {
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[1.05fr_0.95fr]">
       <div>
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-emerald-900">{statusLabel(obligation, now)}</p>
-        <h1 className="mt-2 text-3xl font-medium leading-snug tracking-tight">{sentence}</h1>
+        <p className="kicker">{statusLabel(obligation, now)}</p>
+        <h1 className="mt-2 text-3xl font-semibold leading-snug tracking-tight">{sentence}</h1>
         <p className="mt-3 text-sm text-muted-foreground">
           Cap {formatYen(obligation.maxQuote)}
           {obligation.acceptedQuote !== "0" ? ` · frozen at ${formatYen(obligation.acceptedQuote)}` : ""}
@@ -136,13 +136,13 @@ export function ObligationScreen() {
           <Conditions obligation={obligation} now={now} />
         </div>
         {explorer ? (
-          <a className="mt-4 inline-block text-sm underline decoration-border underline-offset-4" href={explorer} target="_blank" rel="noreferrer">
+          <a className="mt-4 inline-block font-mono text-xs uppercase tracking-[0.12em] text-[#7af7e2] underline decoration-[#3dffc8]/40 underline-offset-4" href={explorer} target="_blank" rel="noreferrer">
             View the object on Sui
           </a>
         ) : null}
       </div>
       <div className="space-y-5">
-        <section className="rounded-md border bg-card p-5">
+        <section className="panel p-5">
           <h2 className="text-sm font-medium">What the agent can see</h2>
           <ol className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
             {trace.map((line) => (
@@ -152,7 +152,7 @@ export function ObligationScreen() {
         </section>
 
         {obligation.status === OFFERED && !expired ? (
-          <section className="rounded-md border bg-card p-5">
+          <section className="panel p-5">
             <h2 className="text-sm font-medium">Contact a desk</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               The agent asks a merchant to accept at their own price. The price has to sit at or under the cap. An unverified desk is refused when verification is required.
@@ -190,7 +190,7 @@ export function ObligationScreen() {
         ) : null}
 
         {obligation.status === ACCEPTED && !obligation.proof && boundDesk ? (
-          <section className="rounded-md border bg-card p-5">
+          <section className="panel p-5">
             <h2 className="text-sm font-medium">Proof of delivery</h2>
             <p className="mt-1 text-sm text-muted-foreground">The bound merchant posts the reference. Release stays closed until it is on the object.</p>
             <div className="mt-3 space-y-2">
@@ -210,7 +210,7 @@ export function ObligationScreen() {
         ) : null}
 
         {obligation.status === ACCEPTED ? (
-          <section className="rounded-md border bg-card p-5">
+          <section className="panel p-5">
             <h2 className="text-sm font-medium">Release</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {ready
@@ -252,7 +252,7 @@ export function ObligationScreen() {
         ) : null}
 
         {obligation.status === OFFERED || obligation.status === ACCEPTED ? (
-          <section className="rounded-md border border-dashed p-5">
+          <section className="panel panel-dashed p-5">
             <h2 className="text-sm font-medium">Instructions the agent is not allowed to run</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               A merchant who changes the price, or a payment sent somewhere else, does not get a transaction that succeeds.
@@ -287,11 +287,11 @@ export function ObligationScreen() {
                 Pay a different address
               </Button>
             </div>
-            {refusal ? <p className="mt-3 text-sm text-[#8d2e2e]">{refusal}</p> : null}
+            {refusal ? <p className="mt-3 text-sm text-stop">{refusal}</p> : null}
           </section>
         ) : null}
 
-        {error ? <p className="text-sm text-[#8d2e2e]">{error}</p> : null}
+        {error ? <p className="text-sm text-stop">{error}</p> : null}
         {obligation.status === OFFERED ? (
           <p className="text-sm text-muted-foreground">
             A merchant without a published key can accept from the{" "}

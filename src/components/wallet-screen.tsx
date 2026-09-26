@@ -64,8 +64,8 @@ export function WalletScreen() {
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <section>
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-emerald-900">Agent signer</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">The key that locks and asks</h1>
+        <p className="kicker">Agent signer</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">The key that locks and asks</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           This is the payer. It signs the escrow and the release request. It does not decide the terms. The obligation does.
         </p>
@@ -78,16 +78,16 @@ export function WalletScreen() {
         )}
       </section>
       <section>
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-emerald-900">Merchant key</p>
-        <h2 className="mt-2 text-3xl font-medium tracking-tight">{vault ? shortAddress(vault.address) : "None on this device"}</h2>
+        <p className="kicker">Merchant key</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{vault ? shortAddress(vault.address) : "None on this device"}</h2>
         {!vault ? (
           <div className="mt-3">
             <p className="text-sm text-muted-foreground">Created when a merchant accepts from the desk, then encrypted with their password.</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Button asChild className="rounded-md">
+              <Button asChild>
                 <Link href="/desk">Open the desk</Link>
               </Button>
-              <Label className="inline-flex h-9 cursor-pointer items-center rounded-md border bg-card px-3 text-sm">
+              <Label className="inline-flex h-9 cursor-pointer items-center rounded-full border border-white/15 bg-white/5 px-3 text-sm">
                 Import backup
                 <input
                   type="file"
@@ -107,27 +107,27 @@ export function WalletScreen() {
             {!secret ? (
               <form onSubmit={unlock} className="mt-4 max-w-sm space-y-3">
                 <Label htmlFor="unlock">Password</Label>
-                <Input id="unlock" type="password" className="h-11 bg-card px-3" value={password} onChange={(event) => setPassword(event.target.value)} />
-                <Button className="rounded-md">Unlock</Button>
+                <Input id="unlock" type="password" className="h-11 px-3" value={password} onChange={(event) => setPassword(event.target.value)} />
+                <Button>Unlock</Button>
               </form>
             ) : (
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-md border bg-card p-4">
+                <div className="panel p-4">
                   <p className="text-sm text-muted-foreground">Test USDC</p>
-                  <p className="mt-1 text-2xl">{balances ? formatUsd(balances.usdc) : "…"}</p>
+                  <p className="mt-1 font-mono text-2xl text-[#7af7e2]">{balances ? formatUsd(balances.usdc) : "…"}</p>
                 </div>
-                <div className="rounded-md border bg-card p-4">
+                <div className="panel p-4">
                   <p className="text-sm text-muted-foreground">SUI</p>
-                  <p className="mt-1 text-2xl">{balances ? formatSui(balances.sui) : "…"}</p>
+                  <p className="mt-1 font-mono text-2xl">{balances ? formatSui(balances.sui) : "…"}</p>
                 </div>
               </div>
             )}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" className="bg-card" onClick={downloadBackup}>
+              <Button variant="outline" onClick={downloadBackup}>
                 Download encrypted backup
               </Button>
               {accountUrl ? (
-                <Button asChild variant="outline" className="bg-card">
+                <Button asChild variant="outline">
                   <a href={accountUrl} target="_blank" rel="noreferrer">
                     View on Sui
                   </a>
@@ -149,7 +149,7 @@ export function WalletScreen() {
             </details>
           </div>
         )}
-        {error ? <p className="mt-4 text-sm text-[#8d2e2e]">{error}</p> : null}
+        {error ? <p className="mt-4 text-sm text-stop">{error}</p> : null}
       </section>
     </div>
   );

@@ -82,8 +82,8 @@ export function DeskScreen() {
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[0.9fr_1.1fr]">
       <div>
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-emerald-900">Merchant desk</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Accept only if you mean the terms.</h1>
+        <p className="kicker">Merchant desk</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Accept only if you mean the terms.</h1>
         <p className="mt-2 text-muted-foreground">
           If the merchant has no wallet, one is created here. The key is encrypted with their password. Gas for acceptance is sponsored, so they do not need SUI first. Verification is separate, and the obligation will refuse an unverified desk when the user required one.
         </p>
@@ -91,22 +91,22 @@ export function DeskScreen() {
           <form onSubmit={createDesk} className="mt-6 space-y-3">
             <div className="space-y-2">
               <Label htmlFor="desk-name">Desk name</Label>
-              <Input id="desk-name" className="h-11 bg-card px-3" value={name} onChange={(event) => setName(event.target.value)} required />
+              <Input id="desk-name" className="h-11 px-3" value={name} onChange={(event) => setName(event.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" className="h-11 bg-card px-3" value={password} onChange={(event) => setPassword(event.target.value)} required />
+              <Input id="password" type="password" className="h-11 px-3" value={password} onChange={(event) => setPassword(event.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirm password</Label>
-              <Input id="confirm" type="password" className="h-11 bg-card px-3" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
+              <Input id="confirm" type="password" className="h-11 px-3" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
             </div>
-            <Button className="h-11 rounded-md px-5" disabled={busy !== null}>
+            <Button className="h-11 px-5" disabled={busy !== null}>
               {busy === "create" ? "Creating…" : "Create the merchant key"}
             </Button>
           </form>
         ) : (
-          <div className="mt-6 rounded-md border bg-card p-4 text-sm">
+          <div className="panel mt-6 p-4 text-sm">
             <p className="text-muted-foreground">This device</p>
             <p className="mt-1 font-mono">{shortAddress(address)}</p>
             <p className="mt-2">{isVerified ? "On the verification registry." : "Not verified yet."}</p>
@@ -136,7 +136,7 @@ export function DeskScreen() {
             ) : null}
           </div>
         )}
-        {error ? <p className="mt-4 text-sm text-[#8d2e2e]">{error}</p> : null}
+        {error ? <p className="mt-4 text-sm text-stop">{error}</p> : null}
       </div>
       <div className="space-y-6">
         <section>
@@ -144,7 +144,7 @@ export function DeskScreen() {
           {open.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No offered obligations.</p> : null}
           <div className="mt-3 space-y-3">
             {open.map((row) => (
-              <article key={row.id} className="rounded-md border bg-card p-4">
+              <article key={row.id} className="panel p-4">
                 <p className="font-medium">{row.service}</p>
                 <p className="mt-1 text-sm text-muted-foreground">Cap {formatYen(row.maxQuote)} · {row.requireVerified ? "verified merchant required" : "verification not required"}</p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -179,7 +179,7 @@ export function DeskScreen() {
           {mine.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Nothing is bound to this desk.</p> : null}
           <div className="mt-3 space-y-3">
             {mine.map((row) => (
-              <article key={row.id} className="rounded-md border bg-card p-4">
+              <article key={row.id} className="panel p-4">
                 <p className="font-medium">{row.service}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Frozen at {formatYen(row.acceptedQuote)}. {row.proof ? `Proof: ${row.proof}` : "No proof yet."}
