@@ -40,7 +40,7 @@ export function ObligationScreen() {
   const [obligation, setObligation] = useState<ObligationRecord | null | undefined>(undefined);
   const [desks, setDesks] = useState<Desk[]>([]);
   const [status, setStatus] = useState<ChainStatus | null>(null);
-  const [proof, setProof] = useState("POD-4421 · handed to the concierge");
+  const [proof, setProof] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -202,10 +202,10 @@ export function ObligationScreen() {
             {boundDesk?.reachable ? (
               <div className="mt-3 space-y-2">
                 <Label htmlFor="proof">Reference</Label>
-                <Input id="proof" className="h-11 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} />
+                <Input id="proof" className="h-11 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} placeholder="Delivery reference" required />
                 <Button
                   type="button"
-                  disabled={busy !== null}
+                  disabled={busy !== null || proof.trim().length === 0}
                   onClick={() =>
                     run("proof", () => submitDeskProof(obligation.id, boundDesk.address, proof), "Proof is on the obligation.")
                   }

@@ -55,7 +55,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               Keys
             </Link>
             <span
-              title={status ? (live ? `Sui ${status.mode}` : "Preview ledger") : "Checking Sui"}
+              title={status ? (live ? `Sui ${status.mode}` : status.rpcError || "Sui offline") : "Checking Sui"}
               className={cn(
                 "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 font-mono uppercase tracking-[0.12em]",
                 live ? "border-[#3dffc8]/40 text-[#7af7e2]" : "border-white/10 text-muted-foreground",
@@ -63,7 +63,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             >
               <span className={cn("size-1.5 rounded-full", live ? "bg-[#3dffc8] shadow-[0_0_8px_#3dffc8]" : "bg-muted-foreground")} />
               <span className="hidden sm:inline">
-                {status ? (live ? `Sui ${status.mode}` : "Preview ledger") : "Checking Sui…"}
+                {status ? (live ? `Sui ${status.mode}` : "Sui offline") : "Checking Sui…"}
               </span>
             </span>
           </div>

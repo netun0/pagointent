@@ -18,8 +18,8 @@ export function ComposeScreen() {
   const address = payer?.address ?? null;
   const secret = payer?.secret ?? null;
   const [balances, setBalances] = useState<BalanceSnapshot | null>(null);
-  const [service, setService] = useState("this service");
-  const [amount, setAmount] = useState("3000");
+  const [service, setService] = useState("");
+  const [amount, setAmount] = useState("");
   const [date, setDate] = useState(weekAheadInputValue);
   const [verified, setVerified] = useState(true);
   const [proof, setProof] = useState(true);
@@ -132,12 +132,12 @@ export function ComposeScreen() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="service">Service</Label>
-              <Input id="service" className="h-11 px-3 font-mono" value={service} onChange={(event) => setService(event.target.value)} required />
+              <Input id="service" className="h-11 px-3 font-mono" value={service} onChange={(event) => setService(event.target.value)} placeholder="What is being bought" required />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="amount">Up to (JPY)</Label>
-                <Input id="amount" className="h-11 px-3 font-mono" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} required />
+                <Input id="amount" className="h-11 px-3 font-mono" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="3000" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="date">Accept and deliver by</Label>

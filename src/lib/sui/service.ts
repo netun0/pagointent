@@ -7,25 +7,6 @@ import { chainMode, deployment } from "@/lib/sui/config";
 import { sui } from "@/lib/sui/client";
 import { quoteToMicro } from "@/lib/sui/format";
 import {
-  localAccept,
-  localBalances,
-  localBootstrap,
-  localCancel,
-  localContact,
-  localCreate,
-  localDecline,
-  localObligation,
-  localObligations,
-  localProof,
-  localProve,
-  localReclaim,
-  localRedirect,
-  localRelease,
-  localRevise,
-  localDesks,
-  localVerify,
-} from "@/lib/sui/local-ledger";
-import {
   RATE_DEN,
   RATE_NUM,
   type BalanceSnapshot,
@@ -36,6 +17,11 @@ import {
 } from "@/lib/sui/types";
 
 const secretPath = path.join(process.cwd(), "data", "merchant-secrets.json");
+const offChain = "This server is not settling on Sui, and it will not keep a stand-in ledger.";
+
+function requireChain() {
+  if (chainMode() === "local") throw new Error(offChain);
+}
 
 function aborted(raw: string, code: number) {
   return new RegExp(`abort code: ${code}\\b`).test(raw) || raw.includes(`, ${code})`);
@@ -205,8 +191,8 @@ export async function getStatus(): Promise<ChainStatus> {
       sponsorReady: false,
       referenceGasPrice: null,
       publishDigest: null,
-      rpcOk: true,
-      rpcError: null,
+      rpcOk: false,
+      rpcError: offChain,
     };
   }
   let referenceGasPrice: string | null = null;
@@ -232,7 +218,7 @@ export async function getStatus(): Promise<ChainStatus> {
 }
 
 export async function getBalances(owner: string): Promise<BalanceSnapshot> {
-  if (chainMode() === "local") return localBalances(owner);
+  requireChain();
   const [suiBalance, usdcBalance] = await Promise.all([
     sui().getBalance({ owner }),
     sui().getBalance({ owner, coinType: deployment().usdcType }),
@@ -241,7 +227,7 @@ export async function getBalances(owner: string): Promise<BalanceSnapshot> {
 }
 
 export async function listObligations(): Promise<ObligationRecord[]> {
-  if (chainMode() === "local") return localObligations();
+  requireChain();
   const deployed = deployment();
   const created = await events(`${deployed.packageId}::obligation::ObligationCreated`);
   const ids = created.map((event) => asString(event.json?.obligation_id)).filter(Boolean);
@@ -253,7 +239,7 @@ export async function listObligations(): Promise<ObligationRecord[]> {
 }
 
 export async function getObligation(id: string): Promise<ObligationRecord | null> {
-  if (chainMode() === "local") return localObligation(id);
+  requireChain();
   try {
     const response = await sui().getObject({ objectId: id, include: { json: true } });
     if (!response.object.json || !response.object.type?.includes("::obligation::Obligation")) return null;
@@ -274,27 +260,20 @@ function desksFromRegistry(names: Map<string, string>): Desk[] {
 }
 
 export async function listDesks(): Promise<{ desks: Desk[]; verified: string[] }> {
-  if (chainMode() === "local") {
-    const desks = await localDesks();
-    return { desks, verified: desks.map((desk) => desk.address) };
+  requireChain();
+  const verifiedEvents = await events(`${deployment().packageId}::merchant::MerchantVerified`);
+  const names = new Map<string, string>();
+  for (const event of [...verifiedEvents].reverse()) {
+    const address = asString(event.json?.merchant).toLowerCase();
+    const name = asString(event.json?.name);
+    if (address && !isZero(address)) names.set(address, name || names.get(address) || "Verified merchant");
   }
-  try {
-    const verifiedEvents = await events(`${deployment().packageId}::merchant::MerchantVerified`);
-    const names = new Map<string, string>();
-    for (const event of [...verifiedEvents].reverse()) {
-      const address = asString(event.json?.merchant).toLowerCase();
-      const name = asString(event.json?.name);
-      if (address && !isZero(address)) names.set(address, name || names.get(address) || "Verified merchant");
-    }
-    const desks = desksFromRegistry(names);
-    return { desks, verified: desks.map((desk) => desk.address) };
-  } catch {
-    return { desks: [], verified: [] };
-  }
+  const desks = desksFromRegistry(names);
+  return { desks, verified: desks.map((desk) => desk.address) };
 }
 
 export async function bootstrap(address: string) {
-  if (chainMode() === "local") return localBootstrap(address);
+  requireChain();
   const deployed = deployment();
   const key = sponsor();
   const before = await getBalances(address);
@@ -346,24 +325,13 @@ function assertText(value: string, label: string, max: number) {
   return trimmed;
 }
 
-export async function act(input: BuildInput): Promise<TxReceipt> {
-  if (chainMode() !== "local") throw new Error("This network needs a signature. Build the transaction first.");
-  if (input.action === "create") return localCreate(input);
-  if (input.action === "cancel") return localCancel(input);
-  if (input.action === "reclaim") return localReclaim(input);
-  if (input.action === "release") return localRelease(input);
-  if (input.action === "revise") return localRevise();
-  if (input.action === "redirect") return localRedirect();
-  if (input.action === "accept") return localAccept(input);
-  if (input.action === "proof") return localProof(input);
-  if (input.action === "decline") return localDecline(input);
-  if (input.action === "verify") return localVerify(input.merchant, input.merchantName);
-  if (input.action === "contact") return localContact(input);
-  return localProve(input);
+export async function act(_input: BuildInput): Promise<TxReceipt> {
+  requireChain();
+  throw new Error("This network needs a signature. Build the transaction first.");
 }
 
 export async function buildTransaction(input: BuildInput) {
-  if (chainMode() === "local") throw new Error("Preview mode does not build chain transactions.");
+  requireChain();
   if (!("sender" in input)) throw new Error("This action is signed on the server.");
   const deployed = deployment();
   const tx = new Transaction();
@@ -471,7 +439,7 @@ async function prepareMerchant(input: Extract<BuildInput, { action: "accept" | "
 }
 
 export async function prepareSponsored(input: BuildInput) {
-  if (chainMode() === "local") throw new Error("Preview mode does not build chain transactions.");
+  requireChain();
   if (input.action !== "accept" && input.action !== "proof" && input.action !== "decline") {
     throw new Error("That action is not sponsored.");
   }
@@ -492,7 +460,7 @@ export async function submitTransaction(bytes: string, signature: string) {
 }
 
 export async function verifyMerchant(merchant: string, merchantName: string) {
-  if (chainMode() === "local") return localVerify(merchant, merchantName);
+  requireChain();
   const deployed = deployment();
   const tx = new Transaction();
   tx.moveCall({
@@ -504,7 +472,7 @@ export async function verifyMerchant(merchant: string, merchantName: string) {
 }
 
 export async function agentAct(input: Extract<BuildInput, { action: "contact" | "prove" }>) {
-  if (chainMode() === "local") return act(input);
+  requireChain();
   const key = merchantKeyFor(input.merchant);
   if (!key) throw new Error("The registry found this merchant. They sign the acceptance from their own desk.");
   const prepared =

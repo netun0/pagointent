@@ -44,7 +44,9 @@ export function MerchantsScreen() {
             </div>
             <p className="mt-3 font-mono text-sm text-muted-foreground">{shortAddress(desk.address)}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {desk.reachable ? "The agent can ask this address to accept." : "This address signs from its own desk."}
+              {desk.reachable
+                ? "This server holds the key for this address, so Ask signs a real acceptance on Sui."
+                : "This address is on the registry. It signs from its own desk."}
             </p>
           </article>
         ))}

@@ -98,7 +98,7 @@ export function obligationSentence(input: { service: string; maxQuote: string; r
   const when = input.requireProof
     ? "only release the money when I receive proof of delivery"
     : "release the money when they accept";
-  return `Buy ${input.service.trim() || "this service"} for up to ${formatYen(input.maxQuote || "0")}, ${who}, and ${when}.`;
+  return `Buy ${input.service.trim() || "the named service"} for up to ${formatYen(input.maxQuote || "0")}, ${who}, and ${when}.`;
 }
 
 export function statusLabel(obligation: Pick<ObligationRecord, "status" | "outcome" | "expiresAtMs">, now = Date.now()) {

@@ -18,7 +18,7 @@ export function DeskScreen() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [quote, setQuote] = useState("");
-  const [proof, setProof] = useState("POD-4421 · handed to the concierge");
+  const [proof, setProof] = useState("");
   const [rows, setRows] = useState<ObligationRecord[]>([]);
   const [verified, setVerified] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -186,11 +186,11 @@ export function DeskScreen() {
                 </p>
                 {!row.proof ? (
                   <div className="mt-3 flex flex-col gap-2">
-                    <Input className="h-10 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} />
+                    <Input className="h-10 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} placeholder="Delivery reference" />
                     <Button
                       variant="outline"
                       className="bg-background"
-                      disabled={busy !== null}
+                      disabled={busy !== null || proof.trim().length === 0}
                       onClick={() => {
                         setBusy(`proof-${row.id}`);
                         setError(null);

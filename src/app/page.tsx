@@ -1,19 +1,15 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { gates, shortAddress, statusLabel } from "@/lib/sui/format";
+import { listObligations } from "@/lib/sui/service";
+import type { ObligationRecord } from "@/lib/sui/types";
+
+export const dynamic = "force-dynamic";
 
 const rules = [
   ["Lock", "The yen cap sits in escrow. Nothing moves until the predicate on the object is true."],
   ["Accept", "A merchant freezes their own price, at or under the cap, and the destination is bound to that address."],
   ["Release", "The agent may pay only when verification, price, destination, proof, and deadline all hold."],
-];
-
-const gates = [
-  ["Cap", "¥3,000", "Hold"],
-  ["Verified merchant", "Required", "Wait"],
-  ["Price", "Not frozen yet", "Wait"],
-  ["Destination", "Unbound", "Wait"],
-  ["Proof of delivery", "Missing", "Wait"],
-  ["Deadline", "Still open", "Hold"],
 ];
 
 const rails = [
@@ -23,7 +19,17 @@ const rails = [
   ["Gas", "Sponsored"],
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  let latest: ObligationRecord | null = null;
+  let chainError: string | null = null;
+  try {
+    const rows = await listObligations();
+    latest = rows[0] ?? null;
+  } catch (error) {
+    chainError = error instanceof Error ? error.message : "Could not read Sui.";
+  }
+  const liveGates = latest ? gates(latest) : [];
+
   return (
     <div className="grid items-start gap-10 lg:grid-cols-[1.15fr_0.85fr]">
       <div>
@@ -62,34 +68,46 @@ export default function HomePage() {
       </div>
       <aside className="panel overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-          <div className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#ff5d73]" />
-            <span className="size-2 rounded-full bg-[#ffd27a]" />
-            <span className="size-2 rounded-full bg-[#3dffc8]" />
-            <span className="ml-2 font-mono text-[11px] text-muted-foreground">obligation.move</span>
-          </div>
-          <span className="chip chip-hold">escrow armed</span>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {latest ? shortAddress(latest.id) : "Latest object"}
+          </span>
+          <span className={latest?.status === 2 ? "chip chip-hold" : "chip chip-wait"}>
+            {latest ? statusLabel(latest) : "On Sui"}
+          </span>
         </div>
-        <div className="px-5 py-4">
-          <p className="kicker">Instruction</p>
-          <p className="mt-2 text-lg leading-snug">
-            Buy this service for up to ¥3,000, only from a verified merchant, and only release the money when I receive proof of delivery.
-          </p>
-        </div>
-        <ul className="divide-y divide-white/8">
-          {gates.map(([label, detail, state]) => (
-            <li key={label} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
-              <span>
-                <span className="font-medium">{label}</span>
-                <span className="mt-0.5 block font-mono text-xs text-muted-foreground">{detail}</span>
-              </span>
-              <span className={state === "Hold" ? "chip chip-hold" : "chip chip-wait"}>{state}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="border-t border-white/10 px-5 py-3 text-sm text-muted-foreground">
-          If the price changes, the destination changes, delivery never arrives, or nobody accepts, the funds stay locked or return.
-        </p>
+        {chainError ? (
+          <p className="px-5 py-4 text-sm text-stop">{chainError}</p>
+        ) : latest ? (
+          <>
+            <div className="px-5 py-4">
+              <p className="kicker">On the object</p>
+              <p className="mt-2 text-lg leading-snug">{latest.service}</p>
+              <p className="mt-2 font-mono text-xs text-muted-foreground">
+                {latest.merchantName || "No merchant yet"} · {shortAddress(latest.destination || latest.payer)}
+              </p>
+            </div>
+            <ul className="divide-y divide-white/8">
+              {liveGates.map((gate) => (
+                <li key={gate.id} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
+                  <span>
+                    <span className="font-medium">{gate.label}</span>
+                    <span className="mt-0.5 block font-mono text-xs text-muted-foreground">{gate.detail}</span>
+                  </span>
+                  <span className={gate.state === "pass" ? "chip chip-hold" : gate.state === "fail" ? "chip chip-stop" : "chip chip-wait"}>
+                    {gate.state === "pass" ? "Holds" : gate.state === "fail" ? "Failed" : "Waiting"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="border-t border-white/10 px-5 py-3 text-sm">
+              <Link href={`/o/${latest.id}`} className="text-[#7af7e2] underline decoration-[#3dffc8]/40 underline-offset-4">
+                Open this obligation
+              </Link>
+            </p>
+          </>
+        ) : (
+          <p className="px-5 py-4 text-sm text-muted-foreground">No obligation objects on this package yet.</p>
+        )}
       </aside>
     </div>
   );
