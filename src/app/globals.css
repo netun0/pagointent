@@ -157,10 +157,22 @@
 }
 
 .chip-hold {
-  color: #3dffc8;
-  background: rgba(61, 255, 200, 0.08);
-  border-color: #3dffc8;
+  gap: 0.4rem;
+  padding: 0.1rem 0;
+  color: #7af7e2;
+  background: transparent;
+  border-color: transparent;
   box-shadow: none;
+}
+
+.chip-hold::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #3dffc8;
+  box-shadow: 0 0 10px rgba(61, 255, 200, 0.75);
+  flex-shrink: 0;
 }
 
 .chip-wait {
