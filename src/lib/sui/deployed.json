@@ -1,0 +1,10 @@
+{
+  "network": "devnet",
+  "packageId": "0x090f2b2ae139c6c8974b7a531d92eee8bd81440e6995428ff8191d4db849cb93",
+  "mintHubId": "0x02bdb8b9b7db32f391e815df2614d7dde653780ce9d0d1f107cf2538a7a40c4f",
+  "badgeRegistryId": "0x4e91e0c96a653184f814864eaa69b6f460fe09660fc8cc95379d2e6c0133290e",
+  "usdcType": "0x090f2b2ae139c6c8974b7a531d92eee8bd81440e6995428ff8191d4db849cb93::usdc::USDC",
+  "upgradeCapId": "0x2ee7dd9fd9a85e2cdf8b72fb406f72e89c8daecdf5695edf43d7fbbf97553eee",
+  "sponsorAddress": "0xee656520f646aaa2ee5da20c7e42d5c3f0b7764501acd4b9ce0b10563195dd4e",
+  "publishDigest": "6MiBujXBobfxnoyNGdmGtujVXpaFxc81ibmr2qzy4BPn"
+}
