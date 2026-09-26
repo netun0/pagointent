@@ -30,7 +30,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070b12]/75 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3">
           <Link href="/" className="flex min-w-0 items-center gap-2.5 text-sm font-semibold tracking-tight">
-            <Logo size={32} priority />
+            <Logo size={44} alt="PagoIntent" />
             <span className="truncate">PagoIntent</span>
           </Link>
           <nav className="ml-2 hidden items-center gap-1 md:flex">
