@@ -158,7 +158,7 @@
 
 .chip-hold {
   color: #3dffc8;
-  background: transparent;
+  background: rgba(61, 255, 200, 0.08);
   border-color: #3dffc8;
   box-shadow: none;
 }
@@ -188,14 +188,14 @@
 [data-slot="button"][data-variant="default"] {
   border-radius: 999px;
   border: 1px solid #3dffc8;
-  background: transparent;
+  background: rgba(61, 255, 200, 0.08);
   color: #3dffc8;
   font-weight: 600;
   box-shadow: none;
 }
 
 [data-slot="button"][data-variant="default"]:hover {
-  background: transparent;
+  background: rgba(61, 255, 200, 0.14);
   border-color: #7af7e2;
   color: #7af7e2;
 }
