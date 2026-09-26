@@ -412,8 +412,16 @@ export async function buildTransaction(input: BuildInput) {
   } else {
     throw new Error("That action is sponsored from the merchant side.");
   }
-  const bytes = await tx.build({ client: sui() });
-  return { bytes: Buffer.from(bytes).toString("base64") };
+  return transactionBytes(tx);
+}
+
+async function transactionBytes(tx: Transaction) {
+  try {
+    const bytes = await tx.build({ client: sui() });
+    return { bytes: Buffer.from(bytes).toString("base64") };
+  } catch (error) {
+    throw new Error(explain(error));
+  }
 }
 
 async function prepareMerchant(input: Extract<BuildInput, { action: "accept" | "proof" | "decline" }>) {
@@ -447,8 +455,7 @@ async function prepareMerchant(input: Extract<BuildInput, { action: "accept" | "
       arguments: [tx.object(input.obligationId)],
     });
   }
-  const bytes = await tx.build({ client: sui() });
-  return { bytes: Buffer.from(bytes).toString("base64") };
+  return transactionBytes(tx);
 }
 
 export async function prepareSponsored(input: BuildInput) {
