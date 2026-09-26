@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/i18n/context";
+import { statusLabelLocale } from "@/i18n/format-locale";
 import { listObligations } from "@/lib/actions";
-import { formatYen, shortAddress, statusLabel } from "@/lib/sui/format";
+import { formatYen, shortAddress } from "@/lib/sui/format";
 import type { ObligationRecord } from "@/lib/sui/types";
 
 export function ObligationsScreen() {
+  const { messages } = useI18n();
+  const o = messages.obligations;
   const [rows, setRows] = useState<ObligationRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
@@ -27,17 +31,17 @@ export function ObligationsScreen() {
 
   return (
     <div>
-      <p className="kicker">Ledger</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Obligations</h1>
-      <p className="mt-2 max-w-xl text-muted-foreground">Each row is a shared object. The funds inside it move only when the conditions on the object are true.</p>
+      <p className="kicker">{o.kicker}</p>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight">{o.title}</h1>
+      <p className="mt-2 max-w-xl text-muted-foreground">{o.lead}</p>
       {error ? <p className="mt-6 text-sm text-stop">{error}</p> : null}
-      {rows === null && !error ? <p className="mt-6 text-muted-foreground">Reading shared objects…</p> : null}
+      {rows === null && !error ? <p className="mt-6 text-muted-foreground">{o.reading}</p> : null}
       {rows && rows.length === 0 ? (
         <div className="panel mt-6 p-5">
-          <p className="font-medium">Nothing is locked.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Write an obligation and the escrow shows up here.</p>
+          <p className="font-medium">{o.emptyTitle}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{o.emptyBody}</p>
           <Link href="/compose" className="mt-3 inline-block text-sm underline decoration-border underline-offset-4">
-            Compose one
+            {o.composeOne}
           </Link>
         </div>
       ) : null}
@@ -47,9 +51,9 @@ export function ObligationsScreen() {
             <div>
               <p className="font-medium">{obligation.service}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {statusLabel(obligation, now)}
-                {obligation.merchantName ? ` · ${obligation.merchantName}` : " · no merchant yet"}
-                {shortAddress(obligation.payer) ? ` · payer ${shortAddress(obligation.payer)}` : ""}
+                {statusLabelLocale(messages, obligation, now)}
+                {obligation.merchantName ? ` · ${obligation.merchantName}` : ` · ${o.noMerchantYet}`}
+                {shortAddress(obligation.payer) ? ` · ${o.payer} ${shortAddress(obligation.payer)}` : ""}
               </p>
             </div>
             <p className="font-mono text-sm text-[#7af7e2]">{formatYen(obligation.acceptedQuote !== "0" ? obligation.acceptedQuote : obligation.maxQuote)}</p>

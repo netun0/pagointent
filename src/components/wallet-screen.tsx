@@ -6,12 +6,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/i18n/context";
 import { getBalances, getStatus } from "@/lib/actions";
 import { decryptKey, forgetVault, usePayer, useVault, writeVault, type VaultFile } from "@/lib/custody";
 import { explorerUrl, formatSui, formatUsd, shortAddress } from "@/lib/sui/format";
 import type { BalanceSnapshot, ChainStatus } from "@/lib/sui/types";
 
 export function WalletScreen() {
+  const { messages } = useI18n();
+  const w = messages.wallet;
   const payer = usePayer();
   const vault = useVault();
   const [password, setPassword] = useState("");
@@ -31,7 +34,7 @@ export function WalletScreen() {
       setBalances(nextBalances);
       setStatus(nextStatus);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not open the key.");
+      setError(reason instanceof Error ? reason.message : w.errOpen);
     }
   }
 
@@ -51,10 +54,10 @@ export function WalletScreen() {
       .text()
       .then((text) => {
         const parsed = JSON.parse(text) as VaultFile;
-        if (!parsed.address || !parsed.cipher) throw new Error("That file is not a PagoIntent backup.");
+        if (!parsed.address || !parsed.cipher) throw new Error(w.errBackup);
         writeVault(parsed);
         setSecret(null);
-        toast.success("Backup imported. Unlock it with the password.");
+        toast.success(w.toastImport);
       })
       .catch((reason: Error) => setError(reason.message));
   }
@@ -64,31 +67,33 @@ export function WalletScreen() {
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <section>
-        <p className="kicker">Agent signer</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">The key that locks and asks</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          This is the payer. It signs the escrow and the release request. It does not decide the terms. The obligation does.
-        </p>
+        <p className="kicker">{w.agentKicker}</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{w.agentTitle}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{w.agentLead}</p>
         {payer ? (
           <p className="mt-4 font-mono text-sm">{shortAddress(payer.address)}</p>
         ) : (
           <p className="mt-4 text-sm text-muted-foreground">
-            No signer on this device. <Link className="underline decoration-border underline-offset-4" href="/compose">Compose an obligation</Link> to create one.
+            {w.noSigner}{" "}
+            <Link className="underline decoration-border underline-offset-4" href="/compose">
+              {w.composeLink}
+            </Link>{" "}
+            {w.composeToCreate}
           </p>
         )}
       </section>
       <section>
-        <p className="kicker">Merchant key</p>
-        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{vault ? shortAddress(vault.address) : "None on this device"}</h2>
+        <p className="kicker">{w.merchantKicker}</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{vault ? shortAddress(vault.address) : w.noneOnDevice}</h2>
         {!vault ? (
           <div className="mt-3">
-            <p className="text-sm text-muted-foreground">Created when a merchant accepts from the desk, then encrypted with their password.</p>
+            <p className="text-sm text-muted-foreground">{w.merchantCreated}</p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/desk">Open the desk</Link>
+                <Link href="/desk">{w.openDesk}</Link>
               </Button>
               <Label className="inline-flex h-9 cursor-pointer items-center rounded-full border border-white/15 bg-white/5 px-3 text-sm">
-                Import backup
+                {w.importBackup}
                 <input
                   type="file"
                   accept="application/json"
@@ -103,39 +108,39 @@ export function WalletScreen() {
           </div>
         ) : (
           <div className="mt-4">
-            <p className="text-sm text-muted-foreground">AES-GCM ciphertext in this browser. PagoIntent never sees the password.</p>
+            <p className="text-sm text-muted-foreground">{w.cipherNote}</p>
             {!secret ? (
               <form onSubmit={unlock} className="mt-4 max-w-sm space-y-3">
-                <Label htmlFor="unlock">Password</Label>
+                <Label htmlFor="unlock">{w.password}</Label>
                 <Input id="unlock" type="password" className="h-11 px-3" value={password} onChange={(event) => setPassword(event.target.value)} />
-                <Button>Unlock</Button>
+                <Button>{w.unlock}</Button>
               </form>
             ) : (
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="panel p-4">
-                  <p className="text-sm text-muted-foreground">Test USDC</p>
+                  <p className="text-sm text-muted-foreground">{w.testUsdc}</p>
                   <p className="mt-1 font-mono text-2xl text-[#7af7e2]">{balances ? formatUsd(balances.usdc) : "…"}</p>
                 </div>
                 <div className="panel p-4">
-                  <p className="text-sm text-muted-foreground">SUI</p>
+                  <p className="text-sm text-muted-foreground">{w.sui}</p>
                   <p className="mt-1 font-mono text-2xl">{balances ? formatSui(balances.sui) : "…"}</p>
                 </div>
               </div>
             )}
             <div className="mt-4 flex flex-wrap gap-2">
               <Button variant="outline" onClick={downloadBackup}>
-                Download encrypted backup
+                {w.downloadBackup}
               </Button>
               {accountUrl ? (
                 <Button asChild variant="outline">
                   <a href={accountUrl} target="_blank" rel="noreferrer">
-                    View on Sui
+                    {w.viewSui}
                   </a>
                 </Button>
               ) : null}
             </div>
             <details className="mt-6 text-sm text-muted-foreground">
-              <summary className="cursor-pointer text-foreground">Forget this key on this device</summary>
+              <summary className="cursor-pointer text-foreground">{w.forgetSummary}</summary>
               <Button
                 variant="destructive"
                 className="mt-3"
@@ -144,7 +149,7 @@ export function WalletScreen() {
                   setSecret(null);
                 }}
               >
-                Delete the local key
+                {w.deleteLocal}
               </Button>
             </details>
           </div>

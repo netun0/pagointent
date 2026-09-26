@@ -1,11 +1,9 @@
-import { gates, type GateState } from "@/lib/sui/format";
-import type { ObligationRecord } from "@/lib/sui/types";
+"use client";
 
-const mark: Record<GateState, string> = {
-  pass: "Hold",
-  wait: "Wait",
-  fail: "Stop",
-};
+import { useI18n } from "@/i18n/context";
+import { gateMarkLocale, gatesLocale } from "@/i18n/format-locale";
+import type { GateState } from "@/lib/sui/format";
+import type { ObligationRecord } from "@/lib/sui/types";
 
 const chip: Record<GateState, string> = {
   pass: "chip chip-hold",
@@ -14,7 +12,8 @@ const chip: Record<GateState, string> = {
 };
 
 export function Conditions({ obligation, now }: { obligation: ObligationRecord; now: number }) {
-  const rows = gates(obligation, now);
+  const { locale, messages } = useI18n();
+  const rows = gatesLocale(messages, obligation, locale, now);
   return (
     <ol className="panel divide-y divide-white/8">
       {rows.map((row, index) => (
@@ -24,7 +23,7 @@ export function Conditions({ obligation, now }: { obligation: ObligationRecord; 
             <p className="text-sm font-medium">{row.label}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">{row.detail}</p>
           </div>
-          <span className={chip[row.state]}>{mark[row.state]}</span>
+          <span className={chip[row.state]}>{gateMarkLocale(messages, row.state)}</span>
         </li>
       ))}
     </ol>

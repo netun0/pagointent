@@ -4,20 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
+import { LanguageSelect, useI18n } from "@/i18n/context";
 import { getStatus } from "@/lib/actions";
 import type { ChainStatus } from "@/lib/sui/types";
-import { cn } from "cn";
-
-const links = [
-  { href: "/compose", label: "Compose" },
-  { href: "/obligations", label: "Obligations" },
-  { href: "/merchants", label: "Merchants" },
-  { href: "/desk", label: "Desk" },
-];
+import { cn } from "@/lib/utils";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { messages, t } = useI18n();
   const [status, setStatus] = useState<ChainStatus | null>(null);
+
+  const links = [
+    { href: "/compose", label: messages.nav.compose },
+    { href: "/obligations", label: messages.nav.obligations },
+    { href: "/merchants", label: messages.nav.merchants },
+    { href: "/desk", label: messages.nav.desk },
+  ];
 
   useEffect(() => {
     getStatus().then(setStatus).catch(() => setStatus(null));
@@ -48,18 +50,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <div className="ml-auto flex shrink-0 items-center text-xs">
+          <div className="ml-auto flex shrink-0 items-center gap-3 text-xs">
+            <LanguageSelect />
             <Link href="/wallet" className="font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-[#7af7e2]">
-              Keys
+              {messages.nav.keys}
             </Link>
           </div>
         </div>
       </header>
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">{children}</div>
       <footer className="mx-auto w-full max-w-6xl px-4 pb-24 font-mono text-[11px] leading-relaxed tracking-wide text-muted-foreground md:pb-8">
-        PagoIntent decides whether an agent is allowed to pay.
-        Settlement is test USDC on Sui. The obligation is denominated in yen at a rate frozen in the object.
-        {status?.referenceGasPrice ? ` Reference gas ${status.referenceGasPrice} MIST.` : ""}
+        {messages.shell.footer}
+        {status?.referenceGasPrice ? ` ${t(messages.shell.refGas, { rgp: status.referenceGasPrice })}` : ""}
       </footer>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#070b12]/90 backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-4">

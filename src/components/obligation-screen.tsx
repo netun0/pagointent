@@ -8,6 +8,10 @@ import { Conditions } from "@/components/conditions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/i18n/context";
+import { interpolate } from "@/i18n/index";
+import type { Messages } from "@/i18n/messages/types";
+import { obligationSentenceLocale, statusLabelLocale } from "@/i18n/format-locale";
 import {
   cancelObligation,
   contactDesk,
@@ -27,15 +31,15 @@ import {
   formatUsd,
   formatYen,
   isZeroAddress,
-  obligationSentence,
   quoteToMicro,
   shortAddress,
-  statusLabel,
 } from "@/lib/sui/format";
 import { ACCEPTED, OFFERED, RELEASED, RETURNED, type ChainStatus, type Desk, type ObligationRecord } from "@/lib/sui/types";
 
 export function ObligationScreen() {
   const params = useParams<{ id: string }>();
+  const { messages, t } = useI18n();
+  const o = messages.obligation;
   const payer = usePayer();
   const [obligation, setObligation] = useState<ObligationRecord | null | undefined>(undefined);
   const [desks, setDesks] = useState<Desk[]>([]);
@@ -72,12 +76,12 @@ export function ObligationScreen() {
     };
   }, [params.id]);
 
-  if (obligation === undefined) return <p className="text-muted-foreground">Reading the obligation…</p>;
+  if (obligation === undefined) return <p className="text-muted-foreground">{o.reading}</p>;
   if (!obligation) {
     return (
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">This obligation is not on the ledger.</h1>
-        <p className="mt-2 text-muted-foreground">{error || "Check the link and try again."}</p>
+        <h1 className="text-3xl font-semibold tracking-tight">{o.notFound}</h1>
+        <p className="mt-2 text-muted-foreground">{error || o.checkLink}</p>
       </div>
     );
   }
@@ -85,10 +89,10 @@ export function ObligationScreen() {
   const mine = payer?.address.toLowerCase() === obligation.payer.toLowerCase();
   const ready = canRelease(obligation, now);
   const boundDesk = desks.find((desk) => desk.address && desk.address.toLowerCase() === obligation.merchant.toLowerCase());
-  const sentence = obligationSentence(obligation);
+  const sentence = obligationSentenceLocale(messages, obligation);
   const explorer = status ? explorerUrl(status.mode, "object", obligation.id) : null;
   const expired = (obligation.status === OFFERED || obligation.status === ACCEPTED) && obligation.expiresAtMs < now;
-  const trace = buildTrace(obligation);
+  const trace = buildTrace(messages, obligation);
 
   async function run(label: string, task: () => Promise<unknown>, success: string) {
     setBusy(label);
@@ -99,7 +103,7 @@ export function ObligationScreen() {
       toast.success(success);
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The chain refused the instruction.");
+      setError(reason instanceof Error ? reason.message : o.errChain);
     } finally {
       setBusy(null);
     }
@@ -111,7 +115,7 @@ export function ObligationScreen() {
     setRefusal(null);
     try {
       await task();
-      setError("That instruction was not supposed to succeed.");
+      setError(o.errUnexpected);
     } catch (reason) {
       setRefusal(reason instanceof Error ? reason.message : expected);
     } finally {
@@ -119,31 +123,38 @@ export function ObligationScreen() {
     }
   }
 
+  const paidUsd = formatUsd(
+    quoteToMicro(BigInt(obligation.acceptedQuote), BigInt(obligation.rateNum), BigInt(obligation.rateDen)),
+  );
+  const escrowUsd = formatUsd(
+    obligation.escrow || quoteToMicro(BigInt(obligation.maxQuote), BigInt(obligation.rateNum), BigInt(obligation.rateDen)),
+  );
+
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[1.05fr_0.95fr]">
       <div>
-        <p className="kicker">{statusLabel(obligation, now)}</p>
+        <p className="kicker">{statusLabelLocale(messages, obligation, now)}</p>
         <h1 className="mt-2 text-3xl font-semibold leading-snug tracking-tight">{sentence}</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Cap {formatYen(obligation.maxQuote)}
-          {obligation.acceptedQuote !== "0" ? ` · frozen at ${formatYen(obligation.acceptedQuote)}` : ""}
+          {o.cap} {formatYen(obligation.maxQuote)}
+          {obligation.acceptedQuote !== "0" ? ` · ${o.frozenAt} ${formatYen(obligation.acceptedQuote)}` : ""}
           {" · "}
           {obligation.status === RELEASED
-            ? `paid ${formatUsd(quoteToMicro(BigInt(obligation.acceptedQuote), BigInt(obligation.rateNum), BigInt(obligation.rateDen)))} to ${shortAddress(obligation.destination)}`
-            : `escrow ${formatUsd(obligation.escrow || quoteToMicro(BigInt(obligation.maxQuote), BigInt(obligation.rateNum), BigInt(obligation.rateDen)))}`}
+            ? t(o.paid, { usd: paidUsd, dest: shortAddress(obligation.destination) })
+            : t(o.escrow, { usd: escrowUsd })}
         </p>
         <div className="mt-6">
           <Conditions obligation={obligation} now={now} />
         </div>
         {explorer ? (
           <a className="mt-4 inline-block font-mono text-xs uppercase tracking-[0.12em] text-[#7af7e2] underline decoration-[#3dffc8]/40 underline-offset-4" href={explorer} target="_blank" rel="noreferrer">
-            View the object on Sui
+            {o.viewObject}
           </a>
         ) : null}
       </div>
       <div className="space-y-5">
         <section className="panel p-5">
-          <h2 className="text-sm font-medium">What the agent can see</h2>
+          <h2 className="text-sm font-medium">{o.agentSees}</h2>
           <ol className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
             {trace.map((line) => (
               <li key={line}>{line}</li>
@@ -153,16 +164,16 @@ export function ObligationScreen() {
 
         {obligation.status === OFFERED && !expired ? (
           <section className="panel p-5">
-            <h2 className="text-sm font-medium">Merchants on the registry</h2>
+            <h2 className="text-sm font-medium">{o.merchantsRegistry}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              The agent reads who is verified on Sui and asks one of them to accept at the cap, {formatYen(obligation.maxQuote)}. A merchant who verifies from the desk shows up here on the next read.
+              {t(o.merchantsLead, { cap: formatYen(obligation.maxQuote) })}
             </p>
             <div className="mt-4 space-y-3">
               {desks.map((desk) => (
                 <div key={desk.id} className="flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium">
-                      {desk.name} <span className="chip chip-hold">Verified</span>
+                      {desk.name} <span className="chip chip-hold">{o.verified}</span>
                     </p>
                     <p className="mt-1 font-mono text-xs text-muted-foreground">{shortAddress(desk.address)}</p>
                   </div>
@@ -175,47 +186,41 @@ export function ObligationScreen() {
                         run(
                           desk.id,
                           () => contactDesk(obligation.id, desk.address, desk.name, obligation.maxQuote),
-                          `${desk.name} accepted at the cap.`,
+                          t(o.toastAccepted, { name: desk.name }),
                         )
                       }
                     >
-                      {busy === desk.id ? "Asking…" : `Ask at ${formatYen(obligation.maxQuote)}`}
+                      {busy === desk.id ? o.asking : t(o.askAt, { cap: formatYen(obligation.maxQuote) })}
                     </Button>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Signs from their own desk.</p>
+                    <p className="text-sm text-muted-foreground">{o.signsOwnDesk}</p>
                   )}
                 </div>
               ))}
             </div>
-            {desks.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Nobody is verified yet. A merchant opens the desk, creates a key, and asks the registry. Then the agent can find them.
-              </p>
-            ) : null}
+            {desks.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">{o.noVerified}</p> : null}
           </section>
         ) : null}
 
         {obligation.status === ACCEPTED && !obligation.proof ? (
           <section className="panel p-5">
-            <h2 className="text-sm font-medium">Proof of delivery</h2>
-            <p className="mt-1 text-sm text-muted-foreground">The bound merchant posts the reference. Release stays closed until it is on the object.</p>
+            <h2 className="text-sm font-medium">{o.proofTitle}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{o.proofLead}</p>
             {boundDesk?.reachable ? (
               <div className="mt-3 space-y-2">
-                <Label htmlFor="proof">Reference</Label>
-                <Input id="proof" className="h-11 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} placeholder="Delivery reference" required />
+                <Label htmlFor="proof">{o.reference}</Label>
+                <Input id="proof" className="h-11 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} placeholder={o.proofPlaceholder} required />
                 <Button
                   type="button"
                   disabled={busy !== null || proof.trim().length === 0}
-                  onClick={() =>
-                    run("proof", () => submitDeskProof(obligation.id, boundDesk.address, proof), "Proof is on the obligation.")
-                  }
+                  onClick={() => run("proof", () => submitDeskProof(obligation.id, boundDesk.address, proof), o.toastProof)}
                 >
-                  {busy === "proof" ? "Posting…" : `Post proof as ${boundDesk.name}`}
+                  {busy === "proof" ? o.posting : t(o.postProofAs, { name: boundDesk.name })}
                 </Button>
               </div>
             ) : (
               <p className="mt-3 text-sm text-muted-foreground">
-                {obligation.merchantName || "The merchant"} posts that reference from their desk.
+                {t(o.merchantPosts, { name: obligation.merchantName || o.theMerchant })}
               </p>
             )}
           </section>
@@ -223,23 +228,26 @@ export function ObligationScreen() {
 
         {obligation.status === ACCEPTED ? (
           <section className="panel p-5">
-            <h2 className="text-sm font-medium">Release</h2>
+            <h2 className="text-sm font-medium">{o.releaseTitle}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {ready
-                ? `The predicate holds. Paying ${formatYen(obligation.acceptedQuote)} to ${shortAddress(obligation.destination)} is allowed.`
-                : "The agent can try. The chain releases nothing until every required condition holds."}
+                ? t(o.releaseReady, {
+                    quote: formatYen(obligation.acceptedQuote),
+                    dest: shortAddress(obligation.destination),
+                  })
+                : o.releaseWait}
             </p>
             <Button
               className="mt-3"
               disabled={busy !== null || !payer}
               onClick={() => {
                 if (!payer) return;
-                run("release", () => releaseObligation(payer.secret, obligation.id), "Released to the bound destination.");
+                run("release", () => releaseObligation(payer.secret, obligation.id), o.toastReleased);
               }}
             >
-              {busy === "release" ? "Asking the chain…" : "Ask the agent to pay"}
+              {busy === "release" ? o.askingChain : o.askPay}
             </Button>
-            {!payer ? <p className="mt-2 text-sm text-muted-foreground">The signer that locked this obligation is not on this device.</p> : null}
+            {!payer ? <p className="mt-2 text-sm text-muted-foreground">{o.noPayerDevice}</p> : null}
           </section>
         ) : null}
 
@@ -247,9 +255,9 @@ export function ObligationScreen() {
           <Button
             variant="outline"
             disabled={busy !== null || !payer}
-            onClick={() => payer && run("cancel", () => cancelObligation(payer.secret, obligation.id), "Escrow returned.")}
+            onClick={() => payer && run("cancel", () => cancelObligation(payer.secret, obligation.id), o.toastCancel)}
           >
-            {busy === "cancel" ? "Returning…" : "Cancel and return the funds"}
+            {busy === "cancel" ? o.returning : o.cancelReturn}
           </Button>
         ) : null}
 
@@ -257,30 +265,25 @@ export function ObligationScreen() {
           <Button
             variant="outline"
             disabled={busy !== null || !payer}
-            onClick={() => payer && run("reclaim", () => reclaimObligation(payer.secret, obligation.id), "Expired funds returned.")}
+            onClick={() => payer && run("reclaim", () => reclaimObligation(payer.secret, obligation.id), o.toastReclaim)}
           >
-            {busy === "reclaim" ? "Returning…" : "Return the expired escrow"}
+            {busy === "reclaim" ? o.returning : o.returnExpired}
           </Button>
         ) : null}
 
         {obligation.status === OFFERED || obligation.status === ACCEPTED ? (
           <section className="panel panel-dashed p-5">
-            <h2 className="text-sm font-medium">Instructions the agent is not allowed to run</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              A merchant who changes the price, or a payment sent somewhere else, does not get a transaction that succeeds.
-            </p>
+            <h2 className="text-sm font-medium">{o.forbiddenTitle}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{o.forbiddenLead}</p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <Button
                 type="button"
                 variant="outline"
                 className="bg-background"
                 disabled={busy !== null || !payer}
-                onClick={() =>
-                  payer &&
-                  refuse("revise", () => revisePrice(payer.secret, obligation.id, "9999"), "The price cannot be revised.")
-                }
+                onClick={() => payer && refuse("revise", () => revisePrice(payer.secret, obligation.id, "9999"), o.refusePrice)}
               >
-                Change the price to ¥9,999
+                {o.changePrice}
               </Button>
               <Button
                 type="button"
@@ -289,14 +292,10 @@ export function ObligationScreen() {
                 disabled={busy !== null || !payer}
                 onClick={() =>
                   payer &&
-                  refuse(
-                    "redirect",
-                    () => redirectPayment(payer.secret, obligation.id, "0x" + "ab".repeat(32)),
-                    "The destination cannot be changed.",
-                  )
+                  refuse("redirect", () => redirectPayment(payer.secret, obligation.id, "0x" + "ab".repeat(32)), o.refuseDest)
                 }
               >
-                Pay a different address
+                {o.payOther}
               </Button>
             </div>
             {refusal ? <p className="mt-3 text-sm text-stop">{refusal}</p> : null}
@@ -306,11 +305,11 @@ export function ObligationScreen() {
         {error ? <p className="text-sm text-stop">{error}</p> : null}
         {obligation.status === OFFERED ? (
           <p className="text-sm text-muted-foreground">
-            A merchant without a published key can accept from the{" "}
+            {o.deskHint}{" "}
             <Link className="underline decoration-border underline-offset-4" href="/desk">
-              desk
+              {o.desk}
             </Link>
-            . If they have no wallet, one is created there and verification is checked before acceptance.
+            {o.deskHintEnd}
           </p>
         ) : null}
       </div>
@@ -318,27 +317,35 @@ export function ObligationScreen() {
   );
 }
 
-function buildTrace(obligation: ObligationRecord) {
+function buildTrace(messages: Messages, obligation: ObligationRecord) {
+  const tr = messages.obligation.trace;
   const lines = [
-    `Escrow locked for ${obligation.service}. The cap is ${formatYen(obligation.maxQuote)}, and the yen-to-USDC rate is frozen on the object.`,
+    interpolate(tr.locked, {
+      service: obligation.service,
+      cap: formatYen(obligation.maxQuote),
+    }),
   ];
   if (obligation.status === OFFERED) {
-    lines.push("No merchant has accepted. Until one does, there is no destination and nothing to release.");
+    lines.push(tr.noAccept);
   }
   if (!isZeroAddress(obligation.merchant)) {
     lines.push(
-      `${obligation.merchantName || "A merchant"} accepted at ${formatYen(obligation.acceptedQuote)}. The only payable address is ${shortAddress(obligation.destination)}.`,
+      interpolate(tr.accepted, {
+        merchant: obligation.merchantName || tr.aMerchant,
+        quote: formatYen(obligation.acceptedQuote),
+        dest: shortAddress(obligation.destination),
+      }),
     );
   }
   if (obligation.requireProof && !obligation.proof && obligation.status === ACCEPTED) {
-    lines.push("Proof of delivery is missing, so a release instruction aborts.");
+    lines.push(tr.proofMissing);
   }
-  if (obligation.proof) lines.push(`Proof is recorded: ${obligation.proof}`);
+  if (obligation.proof) lines.push(interpolate(tr.proofRecorded, { proof: obligation.proof }));
   if (obligation.outcome === "released") {
-    lines.push("Every required condition held. The payment went to the bound address, and any unused cap returned to the payer.");
+    lines.push(tr.released);
   }
   if (obligation.status === RETURNED) {
-    lines.push(`The funds returned to the payer. Outcome: ${obligation.outcome || "returned"}.`);
+    lines.push(interpolate(tr.returned, { outcome: obligation.outcome || "returned" }));
   }
   return lines;
 }

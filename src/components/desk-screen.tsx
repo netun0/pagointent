@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/i18n/context";
 import { getObligation, listDesks, listObligations, merchantAccept, merchantProof, verifyDesk } from "@/lib/actions";
 import { decryptKey, encryptKey, useVault, writeVault } from "@/lib/custody";
 import { formatYen, shortAddress } from "@/lib/sui/format";
@@ -13,6 +14,8 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import Link from "next/link";
 
 export function DeskScreen() {
+  const { messages } = useI18n();
+  const d = messages.desk;
   const vault = useVault();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -54,11 +57,11 @@ export function DeskScreen() {
   async function createDesk(event: React.FormEvent) {
     event.preventDefault();
     if (password.length < 8) {
-      setError("Use at least 8 characters. This password is the only way back to the key.");
+      setError(d.errPassword);
       return;
     }
     if (password !== confirm) {
-      setError("The two passwords don’t match.");
+      setError(d.errMismatch);
       return;
     }
     setBusy("create");
@@ -66,52 +69,50 @@ export function DeskScreen() {
     try {
       const key = new Ed25519Keypair();
       writeVault(await encryptKey(password, key.getSecretKey(), key.toSuiAddress()));
-      toast.success("A merchant key now lives on this device, encrypted.");
+      toast.success(d.toastKey);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create the key.");
+      setError(reason instanceof Error ? reason.message : d.errCreate);
     } finally {
       setBusy(null);
     }
   }
 
   async function withSecret() {
-    if (!vault) throw new Error("Create a merchant key first.");
+    if (!vault) throw new Error(d.errNoKey);
     return decryptKey(password, vault);
   }
 
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[0.9fr_1.1fr]">
       <div>
-        <p className="kicker">Merchant desk</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Accept only if you mean the terms.</h1>
-        <p className="mt-2 text-muted-foreground">
-          If the merchant has no wallet, one is created here. The key is encrypted with their password. Gas for acceptance is sponsored, so they do not need SUI first. Verification is separate, and the obligation will refuse an unverified desk when the user required one.
-        </p>
+        <p className="kicker">{d.kicker}</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{d.title}</h1>
+        <p className="mt-2 text-muted-foreground">{d.lead}</p>
         {!vault ? (
           <form onSubmit={createDesk} className="mt-6 space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="desk-name">Desk name</Label>
+              <Label htmlFor="desk-name">{d.deskName}</Label>
               <Input id="desk-name" className="h-11 px-3" value={name} onChange={(event) => setName(event.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{d.password}</Label>
               <Input id="password" type="password" className="h-11 px-3" value={password} onChange={(event) => setPassword(event.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm">Confirm password</Label>
+              <Label htmlFor="confirm">{d.confirmPassword}</Label>
               <Input id="confirm" type="password" className="h-11 px-3" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
             </div>
             <Button className="h-11 px-5" disabled={busy !== null}>
-              {busy === "create" ? "Creating…" : "Create the merchant key"}
+              {busy === "create" ? d.creating : d.createKey}
             </Button>
           </form>
         ) : (
           <div className="panel mt-6 p-4 text-sm">
-            <p className="text-muted-foreground">This device</p>
+            <p className="text-muted-foreground">{d.thisDevice}</p>
             <p className="mt-1 font-mono">{shortAddress(address)}</p>
-            <p className="mt-2">{isVerified ? "On the verification registry." : "Not verified yet."}</p>
+            <p className="mt-2">{isVerified ? d.onRegistry : d.notVerified}</p>
             <div className="mt-3 space-y-2">
-              <Label htmlFor="unlock">Password, for signing</Label>
+              <Label htmlFor="unlock">{d.unlockLabel}</Label>
               <Input id="unlock" type="password" className="h-11 bg-background px-3" value={password} onChange={(event) => setPassword(event.target.value)} />
             </div>
             {!isVerified ? (
@@ -124,14 +125,14 @@ export function DeskScreen() {
                   setError(null);
                   verifyDesk(address, name)
                     .then(async () => {
-                      toast.success("Registry updated.");
+                      toast.success(d.toastRegistry);
                       await load();
                     })
                     .catch((reason: Error) => setError(reason.message))
                     .finally(() => setBusy(null));
                 }}
               >
-                {busy === "verify" ? "Verifying…" : "Ask the registry to verify this desk"}
+                {busy === "verify" ? d.verifying : d.verifyDesk}
               </Button>
             ) : null}
           </div>
@@ -140,13 +141,15 @@ export function DeskScreen() {
       </div>
       <div className="space-y-6">
         <section>
-          <h2 className="text-sm font-medium">Open offers</h2>
-          {open.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No offered obligations.</p> : null}
+          <h2 className="text-sm font-medium">{d.openOffers}</h2>
+          {open.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">{d.noOffers}</p> : null}
           <div className="mt-3 space-y-3">
             {open.map((row) => (
               <article key={row.id} className="panel p-4">
                 <p className="font-medium">{row.service}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Cap {formatYen(row.maxQuote)} · {row.requireVerified ? "verified merchant required" : "verification not required"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {d.cap} {formatYen(row.maxQuote)} · {row.requireVerified ? d.verifiedRequired : d.verificationNotRequired}
+                </p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <Input className="h-10 bg-background px-3 sm:max-w-32" value={quote} onChange={(event) => setQuote(event.target.value)} />
                   <Button
@@ -157,36 +160,36 @@ export function DeskScreen() {
                       withSecret()
                         .then((secret) => merchantAccept(secret, row.id, quote, name))
                         .then(async () => {
-                          toast.success("Accepted. The destination is now this desk.");
+                          toast.success(d.toastAccepted);
                           await load();
                         })
                         .catch((reason: Error) => setError(reason.message))
                         .finally(() => setBusy(null));
                     }}
                   >
-                    {busy === row.id ? "Accepting…" : "Accept at this price"}
+                    {busy === row.id ? d.accepting : d.acceptPrice}
                   </Button>
                 </div>
                 <Link href={`/o/${row.id}`} className="mt-2 inline-block text-sm text-muted-foreground underline decoration-border underline-offset-4">
-                  Read the conditions
+                  {d.readConditions}
                 </Link>
               </article>
             ))}
           </div>
         </section>
         <section>
-          <h2 className="text-sm font-medium">Waiting on your proof</h2>
-          {mine.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Nothing is bound to this desk.</p> : null}
+          <h2 className="text-sm font-medium">{d.waitingProof}</h2>
+          {mine.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">{d.nothingBound}</p> : null}
           <div className="mt-3 space-y-3">
             {mine.map((row) => (
               <article key={row.id} className="panel p-4">
                 <p className="font-medium">{row.service}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Frozen at {formatYen(row.acceptedQuote)}. {row.proof ? `Proof: ${row.proof}` : "No proof yet."}
+                  {d.frozenAt} {formatYen(row.acceptedQuote)}. {row.proof ? `${d.proofLabel} ${row.proof}` : d.noProofYet}
                 </p>
                 {!row.proof ? (
                   <div className="mt-3 flex flex-col gap-2">
-                    <Input className="h-10 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} placeholder="Delivery reference" />
+                    <Input className="h-10 bg-background px-3" value={proof} onChange={(event) => setProof(event.target.value)} placeholder={d.deliveryRef} />
                     <Button
                       variant="outline"
                       className="bg-background"
@@ -197,7 +200,7 @@ export function DeskScreen() {
                         withSecret()
                           .then((secret) => merchantProof(secret, row.id, proof))
                           .then(async () => {
-                            toast.success("Proof submitted.");
+                            toast.success(d.toastProof);
                             await load();
                             await getObligation(row.id);
                           })
@@ -205,7 +208,7 @@ export function DeskScreen() {
                           .finally(() => setBusy(null));
                       }}
                     >
-                      {busy === `proof-${row.id}` ? "Posting…" : "Submit proof"}
+                      {busy === `proof-${row.id}` ? d.posting : d.submitProof}
                     </Button>
                   </div>
                 ) : null}

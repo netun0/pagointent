@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Providers } from "@/components/providers";
 import { Shell } from "@/components/shell";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -34,10 +35,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <Shell>{children}</Shell>
-        <Toaster />
+        <Providers>
+          <Shell>{children}</Shell>
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );
